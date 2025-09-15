@@ -67,7 +67,7 @@
 </head>
 <body class="bg-gray-100">
 
-    <div id="app-container" class="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden my-4">
+    <div id="app-container" class="w-full max-w-5xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden my-4">
 
         <!-- ===== Login View ===== -->
         <div id="login-view" class="p-8">
@@ -182,23 +182,47 @@
 
                 <!-- Residents Tab -->
                 <div id="residents-tab" class="tab-pane hidden">
-                    <div class="flex justify-between items-center mb-4">
+                    <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                         <h3 class="text-2xl font-semibold text-gray-700">住戶管理</h3>
-                        <button id="view-qrcodes-btn" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"><i class="fas fa-print mr-2"></i>產生 & 列印 QR Code</button>
+                        <div class="flex gap-2">
+                            <input type="file" id="csv-import-input" class="hidden" accept=".csv">
+                            <button id="import-csv-btn" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"><i class="fas fa-file-import mr-2"></i>匯入 CSV</button>
+                            <button id="export-csv-btn" class="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"><i class="fas fa-file-export mr-2"></i>匯出 CSV</button>
+                            <button id="view-qrcodes-btn" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"><i class="fas fa-print mr-2"></i>產生 & 列印 QR Code</button>
+                        </div>
                     </div>
                     <!-- Add Resident Form -->
                     <div class="bg-gray-50 p-4 rounded-lg mb-6">
                         <h4 class="font-semibold mb-2">新增住戶</h4>
-                        <form id="add-resident-form" class="flex flex-col sm:flex-row gap-4 items-end">
-                            <div class="flex-grow w-full">
-                                <label for="resident-household" class="block text-sm font-medium text-gray-700">戶號 (例如: A-101)</label>
+                        <form id="add-resident-form" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                            <div>
+                                <label for="resident-qrcode" class="block text-sm font-medium text-gray-700">QR Code 生成碼 (唯一)</label>
+                                <input type="text" id="resident-qrcode" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            <div>
+                                <label for="resident-household" class="block text-sm font-medium text-gray-700">戶號</label>
                                 <input type="text" id="resident-household" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                             </div>
-                            <div class="flex-grow w-full">
-                                <label for="resident-name" class="block text-sm font-medium text-gray-700">住戶姓名</label>
+                            <div>
+                                <label for="resident-name" class="block text-sm font-medium text-gray-700">姓名</label>
                                 <input type="text" id="resident-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                             </div>
-                            <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">新增</button>
+                            <div>
+                                <label for="resident-address" class="block text-sm font-medium text-gray-700">地址</label>
+                                <input type="text" id="resident-address" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="resident-area" class="block text-sm font-medium text-gray-700">坪數</label>
+                                <input type="text" id="resident-area" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                            <div>
+                                <label for="resident-ratio" class="block text-sm font-medium text-gray-700">區分權比例</label>
+                                <input type="text" id="resident-ratio" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            </div>
+                             <div class="self-end col-span-full">
+                                <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">新增</button>
+                                <span id="add-resident-feedback" class="ml-4 text-sm"></span>
+                            </div>
                         </form>
                     </div>
                     <!-- Resident List -->
@@ -206,8 +230,12 @@
                         <table class="min-w-full bg-white rounded-lg shadow">
                             <thead class="bg-gray-100">
                                 <tr>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">QR Code</th>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">姓名</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">地址</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">坪數</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">區分權比例</th>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">操作</th>
                                 </tr>
                             </thead>
@@ -421,6 +449,7 @@
             let currentUser = null;
             let selectedCommunityId = null;
             let selectedCommunityName = null;
+            let currentResidents = []; // Store current residents for export
             let communityUnsubscribe = null;
             let configUnsubscribe = null;
             let residentsUnsubscribe = null;
@@ -773,6 +802,7 @@
                 if (residentsUnsubscribe) residentsUnsubscribe();
                 residentsUnsubscribe = onSnapshot(query(residentsColRef), (snapshot) => {
                     const residents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    currentResidents = residents; // Update the state for export
                     updateResidentsUI(residents);
                     updateStatusUI(residents);
                 });
@@ -797,21 +827,51 @@
 
             document.getElementById('add-resident-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const residentsColRef = collection(db, 'communities', selectedCommunityId, 'residents');
+                const feedbackEl = document.getElementById('add-resident-feedback');
+                feedbackEl.textContent = '';
+                feedbackEl.classList.remove('text-red-500', 'text-green-600');
+                
+                const qrCodeInput = document.getElementById('resident-qrcode');
                 const householdInput = document.getElementById('resident-household');
                 const nameInput = document.getElementById('resident-name');
-                const newResident = {
+                const addressInput = document.getElementById('resident-address');
+                const areaInput = document.getElementById('resident-area');
+                const ratioInput = document.getElementById('resident-ratio');
+
+                const qrCodeId = qrCodeInput.value.trim();
+                const newResidentData = {
                     householdId: householdInput.value.trim(),
                     name: nameInput.value.trim(),
+                    address: addressInput.value.trim(),
+                    area: areaInput.value.trim(),
+                    ratio: ratioInput.value.trim(),
                     isCheckedIn: false,
                     checkInTime: null,
                 };
-                if (newResident.householdId && newResident.name) {
-                    await addDoc(residentsColRef, newResident);
-                    householdInput.value = '';
-                    nameInput.value = '';
-                    householdInput.focus();
+
+                if (!qrCodeId || !newResidentData.householdId || !newResidentData.name) {
+                    feedbackEl.textContent = 'QR Code, 戶號, 和姓名為必填欄位。';
+                    feedbackEl.classList.add('text-red-500');
+                    return;
                 }
+
+                const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', qrCodeId);
+                const docSnap = await getDoc(residentRef);
+
+                if (docSnap.exists()) {
+                    feedbackEl.textContent = `錯誤：QR Code 生成碼 "${qrCodeId}" 已被使用。`;
+                    feedbackEl.classList.add('text-red-500');
+                    return;
+                }
+                
+                await setDoc(residentRef, newResidentData);
+                feedbackEl.textContent = '住戶新增成功！';
+                feedbackEl.classList.add('text-green-600');
+                
+                e.target.reset(); // Clear form
+                qrCodeInput.focus();
+
+                setTimeout(() => { feedbackEl.textContent = ''; }, 3000);
             });
 
             document.getElementById('resident-list').addEventListener('click', async (e) => {
@@ -819,12 +879,115 @@
                 if (btn) {
                     const residentId = btn.dataset.id;
                     const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', residentId);
-                    const confirmed = await showConfirmModal('刪除住戶', '您確定要刪除這位住戶嗎？', '確定刪除');
+                    const confirmed = await showConfirmModal('刪除住戶', `您確定要刪除 QR Code 為 "${residentId}" 的住戶嗎？`, '確定刪除');
                     if (confirmed) {
                         await deleteDoc(residentRef);
                     }
                 }
             });
+
+            // --- CSV Import/Export ---
+            document.getElementById('export-csv-btn').addEventListener('click', () => {
+                const headers = ['QR Code', '戶號', '姓名', '地址', '坪數', '區分權比例'];
+                const data = currentResidents.map(res => ({
+                    'QR Code': res.id,
+                    '戶號': res.householdId,
+                    '姓名': res.name,
+                    '地址': res.address || '',
+                    '坪數': res.area || '',
+                    '區分權比例': res.ratio || ''
+                }));
+                
+                let csvContent = headers.join(',') + '\n';
+                data.forEach(row => {
+                    const values = headers.map(header => {
+                        let value = row[header].toString();
+                        if (value.includes(',')) {
+                            value = `"${value}"`;
+                        }
+                        return value;
+                    });
+                    csvContent += values.join(',') + '\n';
+                });
+
+                const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", `${selectedCommunityName}_住戶列表.csv`);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+
+            const csvImportInput = document.getElementById('csv-import-input');
+            document.getElementById('import-csv-btn').addEventListener('click', () => csvImportInput.click());
+            csvImportInput.addEventListener('change', async (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const confirmed = await showConfirmModal('匯入CSV', '這將會以CSV中的QR Code碼覆蓋現有資料，確定要繼續嗎？', '確定匯入');
+                if (!confirmed) {
+                    csvImportInput.value = ''; // Reset file input
+                    return;
+                }
+
+                showInfoModal('匯入中...', '正在處理CSV檔案，請稍候...');
+
+                const reader = new FileReader();
+                reader.onload = async (e) => {
+                    const text = e.target.result;
+                    const rows = text.split('\n').filter(row => row.trim() !== '');
+                    const headers = rows.shift().split(',').map(h => h.trim());
+                    
+                    const headerMap = { 'QR Code': 'id', '戶號': 'householdId', '姓名': 'name', '地址': 'address', '坪數': 'area', '區分權比例': 'ratio' };
+                    const residentsToUpload = [];
+
+                    for (const row of rows) {
+                        const values = row.split(',');
+                        const resident = {};
+                        let id = '';
+                        headers.forEach((header, index) => {
+                            const key = headerMap[header];
+                            if (key) {
+                                if (key === 'id') id = values[index].trim();
+                                else resident[key] = values[index].trim();
+                            }
+                        });
+
+                        if (id) {
+                            residentsToUpload.push({ id, data: resident });
+                        }
+                    }
+
+                    if (residentsToUpload.length === 0) {
+                        showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。');
+                        return;
+                    }
+                    
+                    try {
+                        const batch = writeBatch(db);
+                        residentsToUpload.forEach(res => {
+                            const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
+                            const finalData = {
+                                isCheckedIn: false, // Default values
+                                checkInTime: null,
+                                ...res.data // Overwrite with CSV data
+                            };
+                            batch.set(residentRef, finalData, { merge: true }); // Use merge to avoid overwriting check-in status if not provided
+                        });
+                        await batch.commit();
+                        showInfoModal('匯入成功', `成功匯入或更新了 ${residentsToUpload.length} 筆住戶資料。`);
+                    } catch (err) {
+                        console.error("CSV Import Error:", err);
+                        showInfoModal('匯入失敗', `處理過程中發生錯誤: ${err.message}`);
+                    }
+                };
+                reader.readAsText(file);
+                csvImportInput.value = ''; // Reset for next import
+            });
+
 
             // --- UI Update Functions ---
             function updateConfigUI(data) {
@@ -840,8 +1003,12 @@
                 residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
                     const row = document.createElement('tr');
                     row.innerHTML = `
+                        <td class="py-3 px-4 font-mono text-xs">${res.id}</td>
                         <td class="py-3 px-4">${res.householdId}</td>
                         <td class="py-3 px-4">${res.name}</td>
+                        <td class="py-3 px-4">${res.address || '---'}</td>
+                        <td class="py-3 px-4">${res.area || '---'}</td>
+                        <td class="py-3 px-4">${res.ratio || '---'}</td>
                         <td class="py-3 px-4">
                             <button data-id="${res.id}" class="delete-resident-btn text-red-500 hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
                         </td>
