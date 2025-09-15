@@ -84,7 +84,6 @@
                 <div id="auth-error" class="text-red-500 text-sm mb-4 text-center hidden"></div>
                 <div class="flex flex-col sm:flex-row gap-2">
                     <button id="login-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">登入</button>
-                    <button id="register-btn" class="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition duration-150 ease-in-out">註冊新帳號</button>
                 </div>
             </div>
         </div>
@@ -110,7 +109,7 @@
                         <label for="new-community-name" class="block text-sm font-medium text-gray-700">新社區名稱</label>
                         <input type="text" id="new-community-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
                     </div>
-                    <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">建立</button>
+                    <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:bg-gray-400">建立</button>
                 </form>
                 <div id="create-community-error" class="text-red-500 text-sm mt-2"></div>
             </div>
@@ -290,7 +289,7 @@
     <!-- Firebase SDK -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, query, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
@@ -306,7 +305,7 @@
         
         // --- App Initialization ---
         const loginView = document.getElementById('login-view');
-        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
+        if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.apiKey) {
             loginView.innerHTML = `
                 <div class="p-8 text-center bg-red-50 rounded-lg">
                     <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
@@ -350,6 +349,11 @@
                 showView('main-view');
                 document.getElementById('community-name-display').value = communityName;
                 setupCommunityListeners();
+                 // Reset tabs to default
+                document.querySelectorAll('.tab-button').forEach(b => b.classList.remove('active'));
+                document.querySelector('button[data-tab="setup"]').classList.add('active');
+                document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
+                document.getElementById('setup-tab').classList.remove('hidden');
             }
 
             function returnToCommunitySelection() {
@@ -380,7 +384,6 @@
                 btn.addEventListener('click', () => signOut(auth));
             });
 
-            // Re-adding the duplicated login/register listeners as they were outside the new else block
             document.getElementById('login-btn').addEventListener('click', () => {
                 authError.classList.add('hidden');
                 const email = document.getElementById('email').value;
@@ -392,23 +395,6 @@
                 }
                 signInWithEmailAndPassword(auth, email, password).catch(handleAuthError);
             });
-
-            document.getElementById('register-btn').addEventListener('click', () => {
-                authError.classList.add('hidden');
-                const email = document.getElementById('email').value;
-                const password = document.getElementById('password').value;
-                if (!email || !password) {
-                    authError.textContent = '電子郵件和密碼欄位不可空白。';
-                    authError.classList.remove('hidden');
-                    return;
-                }
-                if (password.length < 6) {
-                    authError.textContent = '密碼長度至少需要6個字元。';
-                    authError.classList.remove('hidden');
-                    return;
-                }
-                createUserWithEmailAndPassword(auth, email, password).catch(handleAuthError);
-            });
             
             function handleAuthError(error) {
                 console.error("Authentication Error:", error);
@@ -419,7 +405,7 @@
                     'auth/wrong-password': '信箱或密碼錯誤。',
                     'auth/email-already-in-use': '此信箱已被註冊。',
                     'auth/weak-password': '密碼強度不足，至少需要6個字元。',
-                    'auth/operation-not-allowed': '註冊方式未啟用。請前往 Firebase 後台啟用「電子郵件/密碼」登入。'
+                    'auth/operation-not-allowed': '登入方式未啟用。請聯絡系統管理員。'
                 };
                 authError.textContent = errorMap[error.code] || '發生未知錯誤，請稍後再試。';
             }
@@ -469,7 +455,9 @@
 
             document.getElementById('create-community-form').addEventListener('submit', async (e) => {
                 e.preventDefault();
-                const input = document.getElementById('new-community-name');
+                const form = e.target;
+                const input = form.querySelector('#new-community-name');
+                const button = form.querySelector('button[type="submit"]');
                 const communityName = input.value.trim();
                 const errorEl = document.getElementById('create-community-error');
                 errorEl.textContent = '';
@@ -479,30 +467,35 @@
                     return;
                 }
 
+                button.disabled = true;
+                button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>建立中...';
+
                 try {
-                    // Use a batch write to ensure both operations succeed or fail together
                     const batch = writeBatch(db);
-                    
-                    // 1. Create the new community document
                     const newCommunityRef = doc(collection(db, 'communities'));
+                    
                     batch.set(newCommunityRef, {
                         name: communityName,
                         ownerId: currentUser.uid,
                         createdAt: serverTimestamp()
                     });
 
-                    // 2. Add membership for the current user
                     const membershipRef = doc(db, 'users', currentUser.uid, 'communityMemberships', newCommunityRef.id);
                     batch.set(membershipRef, { joinedAt: serverTimestamp() });
 
                     await batch.commit();
-                    input.value = '';
+                    
+                    // Automatically enter the newly created community
+                    enterCommunity(newCommunityRef.id, communityName);
 
                 } catch (error) {
                     console.error("Error creating community: ", error);
                     errorEl.textContent = '建立社區時發生錯誤，請稍後再試。';
+                    button.disabled = false;
+                    button.innerHTML = '建立';
                 }
             });
+
 
             // --- Community-Specific Data Listeners & Handlers ---
             function setupCommunityListeners() {
