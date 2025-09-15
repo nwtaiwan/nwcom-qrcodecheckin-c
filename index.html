@@ -1195,8 +1195,10 @@
             });
 
             function updateStatusUI(residents) {
-                const totalResidentsEl = document.getElementById('total-residents');
-                if (!totalResidentsEl) return; // Guard clause for the entire function
+                // Guard against calls when the view is not active
+                if (!document.getElementById('status-tab') || document.getElementById('status-tab').classList.contains('hidden')) {
+                    return;
+                }
 
                 const total = residents.length;
                 const checkedInList = residents.filter(r => r.isCheckedIn);
@@ -1212,10 +1214,9 @@
                 const checkedInRatio = checkedInList.reduce((sum, r) => sum + safeParseFloat(r.ratio), 0);
                 const ratioPercentage = totalRatio > 0 ? Math.round((checkedInRatio / totalRatio) * 100) : 0;
 
-                totalResidentsEl.textContent = total;
+                document.getElementById('total-residents').textContent = total;
                 document.getElementById('checked-in-count').textContent = checkedInCount;
                 document.getElementById('not-checked-in-count').textContent = notCheckedInCount;
-                document.getElementById('check-in-percentage').textContent = `${checkInPercentage}%`;
                 document.getElementById('ratio-check-in-percentage').textContent = `${ratioPercentage}%`;
                 document.getElementById('progress-bar').style.width = `${checkInPercentage}%`;
                 
