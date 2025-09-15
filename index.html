@@ -19,18 +19,23 @@
             font-family: 'Inter', '微軟正黑體', sans-serif;
             -webkit-tap-highlight-color: transparent;
         }
-        .tab-button {
-            @apply px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 focus:outline-none;
-        }
-        .tab-button.active {
-            @apply text-blue-600 border-blue-600;
-        }
         #reader {
             width: 100%;
             border: 2px solid #e5e7eb;
             border-radius: 0.5rem;
             overflow: hidden;
         }
+        /* Tab styling */
+        .tab-button {
+            @apply px-4 py-2 text-sm font-medium text-gray-600 rounded-md transition-colors duration-200 focus:outline-none;
+        }
+        .tab-button:hover {
+            @apply bg-gray-200 text-gray-800;
+        }
+        .tab-button.active {
+            @apply bg-white text-blue-600 shadow-sm;
+        }
+
         /* Custom animation for feedback messages */
         @keyframes fadeInOut {
             0% { opacity: 0; transform: translateY(-20px); }
@@ -68,7 +73,7 @@
         <div id="login-view" class="p-8">
             <div class="text-center mb-8">
                 <i class="fas fa-qrcode text-5xl text-red-600"></i>
-                <h1 class="text-3xl font-bold text-gray-800 mt-4">西北社區QR Code報到系統</h1>
+                <h1 class="text-2xl sm:text-3xl font-bold text-gray-800 mt-4">西北社區QR Code報到系統</h1>
             </div>
             
             <div class="max-w-sm mx-auto">
@@ -142,8 +147,8 @@
             </header>
 
             <!-- Tabs -->
-            <nav class="border-b">
-                <div class="flex -mb-px px-4" id="tabs">
+            <nav class="bg-gray-100 p-1">
+                <div class="flex space-x-1" id="tabs">
                     <button data-tab="setup" class="tab-button active"><i class="fas fa-cog mr-2"></i>活動設定</button>
                     <button data-tab="residents" class="tab-button"><i class="fas fa-users mr-2"></i>住戶管理</button>
                     <button data-tab="scanner" class="tab-button"><i class="fas fa-qrcode mr-2"></i>掃碼報到</button>
@@ -438,6 +443,8 @@
                 selectedCommunityName = null;
                 stopScanner();
                 showView('community-selection-view');
+                // Re-establish the listener for the community list to ensure it's fresh.
+                setupCommunityListListener();
             }
 
             document.getElementById('back-to-communities-btn').addEventListener('click', returnToCommunitySelection);
@@ -576,42 +583,108 @@
             });
 
             // --- Community Management ---
+            document.getElementById('community-list').addEventListener('click', async (e) => {
+                const deleteBtn = e.target.closest('.delete-community-btn');
+                const card = e.target.closest('.community-card');
+
+                if (deleteBtn) {
+                    e.stopPropagation(); // Prevent card click event from firing
+                    const communityId = deleteBtn.dataset.id;
+                    const communityName = deleteBtn.dataset.name;
+                    const confirmed = await showConfirmModal(
+                        '刪除社區',
+                        `您確定要刪除「${communityName}」嗎？此動作將會移除所有相關的住戶和活動資料，且無法復原。`,
+                        '確定刪除'
+                    );
+                    if (confirmed) {
+                        await deleteCommunity(communityId);
+                    }
+                } else if (card) {
+                    enterCommunity(card.dataset.id, card.dataset.name);
+                }
+            });
+
+            async function deleteCommunity(communityId) {
+                if (!currentUser) return;
+                showInfoModal('刪除中...', '正在刪除社區所有資料，請稍候。');
+
+                try {
+                    const batch = writeBatch(db);
+
+                    // Delete residents subcollection
+                    const residentsRef = collection(db, 'communities', communityId, 'residents');
+                    const residentsSnap = await getDocs(residentsRef);
+                    residentsSnap.forEach(doc => batch.delete(doc.ref));
+
+                    // Delete eventConfig subcollection
+                    const configRef = collection(db, 'communities', communityId, 'eventConfig');
+                    const configSnap = await getDocs(configRef);
+                    configSnap.forEach(doc => batch.delete(doc.ref));
+                    
+                    // Delete the main community document
+                    const communityDocRef = doc(db, 'communities', communityId);
+                    batch.delete(communityDocRef);
+
+                    // Delete the user's membership to this community
+                    const membershipRef = doc(db, 'users', currentUser.uid, 'communityMemberships', communityId);
+                    batch.delete(membershipRef);
+
+                    await batch.commit();
+                    document.getElementById('info-modal-ok-btn').click(); // Close the "deleting" modal
+                } catch (error) {
+                    console.error("Error deleting community:", error);
+                    document.getElementById('info-modal-ok-btn').click();
+                    showInfoModal('刪除失敗', '刪除社區時發生錯誤，請稍後再試。');
+                }
+            }
+
+
             function setupCommunityListListener() {
                 if (!currentUser) return;
                 const membershipsRef = collection(db, 'users', currentUser.uid, 'communityMemberships');
-                if (communityUnsubscribe) communityUnsubscribe(); 
+                if (communityUnsubscribe) communityUnsubscribe();
                 communityUnsubscribe = onSnapshot(membershipsRef, async (snapshot) => {
-                    document.getElementById('loading-communities').style.display = 'block';
+                    const loadingEl = document.getElementById('loading-communities');
+                    const listEl = document.getElementById('community-list');
+
+                    if (!loadingEl || !listEl) return;
+
+                    loadingEl.style.display = 'block';
+
                     if (snapshot.empty) {
-                        document.getElementById('community-list').innerHTML = '<p class="text-center text-gray-500 col-span-full">您尚未加入任何社區。請建立一個新社區開始使用。</p>';
-                        document.getElementById('loading-communities').style.display = 'none';
+                        listEl.innerHTML = '<p class="text-center text-gray-500 col-span-full">您尚未加入任何社區。請建立一個新社區開始使用。</p>';
+                        loadingEl.style.display = 'none';
                         return;
                     }
 
                     const communityPromises = snapshot.docs.map(docSnap => getDoc(doc(db, 'communities', docSnap.id)));
                     const communityDocs = await Promise.all(communityPromises);
-                    
-                    const communityListEl = document.getElementById('community-list');
-                    communityListEl.innerHTML = '';
+
+                    listEl.innerHTML = '';
                     communityDocs.forEach(docSnap => {
                         if (docSnap.exists()) {
                             const community = { id: docSnap.id, ...docSnap.data() };
-                            const card = document.createElement('div');
-                            card.className = 'bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md hover:border-blue-500 cursor-pointer transition-all';
-                            card.innerHTML = `
-                                <div class="flex items-center mb-2">
+                            const cardWrapper = document.createElement('div');
+                            cardWrapper.className = 'community-card p-6 rounded-lg shadow border border-gray-200 hover:shadow-md hover:border-blue-500 cursor-pointer transition-all relative';
+                            cardWrapper.dataset.id = community.id;
+                            cardWrapper.dataset.name = community.name;
+
+                            cardWrapper.innerHTML = `
+                                <button data-id="${community.id}" data-name="${community.name}" class="delete-community-btn absolute top-2 right-2 text-gray-400 hover:text-red-600 focus:outline-none p-1 z-10">
+                                    <i class="fas fa-trash-alt"></i>
+                                </button>
+                                <div class="flex items-center">
                                     <i class="fas fa-building text-blue-500 text-2xl mr-4"></i>
                                     <div>
-                                        <h3 class="text-xl font-bold text-gray-800">${community.name}</h3>
-                                        <p class="text-sm text-gray-400">ID: ${community.id}</p>
+                                        <h3 class="text-xl font-bold text-gray-800 pointer-events-none">${community.name}</h3>
+                                        <p class="text-sm text-gray-400 pointer-events-none">ID: ${community.id}</p>
                                     </div>
                                 </div>
                             `;
-                            card.addEventListener('click', () => enterCommunity(community.id, community.name));
-                            communityListEl.appendChild(card);
+                            listEl.appendChild(cardWrapper);
                         }
                     });
-                    document.getElementById('loading-communities').style.display = 'none';
+                    loadingEl.style.display = 'none';
                 });
             }
             
