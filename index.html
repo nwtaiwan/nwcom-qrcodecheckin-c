@@ -382,6 +382,17 @@
             const secondaryApp = initializeApp(firebaseConfig, "secondary-app-for-user-creation");
             const secondaryAuth = getAuth(secondaryApp);
 
+            // --- Audio Feedback Setup ---
+            function speak(text) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Stop any previous speech
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-TW'; // Set language to Taiwanese Mandarin
+                    utterance.rate = 1.2;
+                    window.speechSynthesis.speak(utterance);
+                }
+            }
+
             // --- Login UI Enhancements ---
             const passwordInput = document.getElementById('password');
             const togglePasswordBtn = document.getElementById('toggle-password-visibility');
@@ -932,14 +943,17 @@
                     if (residentSnap.exists()) {
                         const residentData = residentSnap.data();
                         if (residentData.isCheckedIn) {
+                            speak('重複報到');
                             showFeedback('重複報到', `${residentData.householdId} ${residentData.name} 已報到過。`, 'orange');
                             addScanLog(`${residentData.householdId} ${residentData.name}`, '重複報到', 'orange');
                         } else {
                             await updateDoc(residentRef, { isCheckedIn: true, checkInTime: serverTimestamp() });
+                            speak('報到成功');
                             showFeedback('報到成功', `${residentData.householdId} ${residentData.name}`, 'green');
                             addScanLog(`${residentData.householdId} ${residentData.name}`, '報到成功', 'green');
                         }
                     } else {
+                        speak('無效的 QR Code');
                         showFeedback('無效的 QR Code', '找不到對應的住戶資料。', 'red');
                         addScanLog(`無效的 Code: ${decodedText.substring(0, 8)}...`, '查無資料', 'red');
                     }
@@ -949,7 +963,7 @@
                      // Add a short cooldown before allowing the next scan
                     setTimeout(() => {
                         isProcessingScan = false;
-                    }, 1500);
+                    }, 1000);
                 }
             }
 
