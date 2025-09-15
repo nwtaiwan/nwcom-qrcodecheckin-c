@@ -36,6 +36,10 @@
             @apply bg-white text-blue-600 shadow-sm;
         }
 
+        .status-filter-button.active {
+            @apply border-blue-500 text-blue-600;
+        }
+
         /* Custom animation for feedback messages */
         @keyframes fadeInOut {
             0% { opacity: 0; transform: translateY(-20px); }
@@ -175,6 +179,10 @@
                             <label for="event-date" class="block text-sm font-medium text-gray-700">日期與時間</label>
                             <input type="datetime-local" id="event-date" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
+                        <div>
+                            <label for="event-ratio-threshold" class="block text-sm font-medium text-gray-700">區分權比例設定 (%)</label>
+                            <input type="number" id="event-ratio-threshold" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="例如：50">
+                        </div>
                         <button id="save-config-btn" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">儲存設定</button>
                         <p id="config-feedback" class="text-green-600 text-sm mt-2"></p>
                     </div>
@@ -267,33 +275,44 @@
                 <!-- Status Tab -->
                 <div id="status-tab" class="tab-pane hidden">
                     <h3 class="text-2xl font-semibold mb-4 text-gray-700">即時報到狀況</h3>
-                    <div class="bg-gray-50 p-4 rounded-lg mb-6 shadow">
-                        <div class="flex justify-around text-center">
-                            <div>
-                                <p class="text-sm text-gray-500">總戶數</p>
-                                <p id="total-residents" class="text-3xl font-bold text-gray-800">0</p>
-                            </div>
-                            <div>
-                                <p class="text-sm text-gray-500">已報到</p>
-                                <p id="checked-in-count" class="text-3xl font-bold text-green-600">0</p>
-                            </div>
-                            <div>
-                                <p class="text-sm text-gray-500">報到率</p>
-                                <p id="check-in-percentage" class="text-3xl font-bold text-blue-600">0%</p>
-                            </div>
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6 shadow grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                        <div>
+                            <p class="text-sm text-gray-500">總戶數</p>
+                            <p id="total-residents" class="text-3xl font-bold text-gray-800">0</p>
                         </div>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
-                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        <div>
+                            <p class="text-sm text-gray-500">已報到</p>
+                            <p id="checked-in-count" class="text-3xl font-bold text-green-600">0</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">未報到</p>
+                            <p id="not-checked-in-count" class="text-3xl font-bold text-red-600">0</p>
+                        </div>
+                        <div>
+                            <p class="text-sm text-gray-500">區分權報到率</p>
+                            <p id="ratio-check-in-percentage" class="text-3xl font-bold text-purple-600">0%</p>
+                        </div>
+                        <div class="col-span-2 md:col-span-4 mt-2">
+                             <div class="w-full bg-gray-200 rounded-full h-2.5">
+                                <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
                         </div>
                     </div>
+                    
+                    <div class="border-b border-gray-200 mb-4">
+                        <nav class="-mb-px flex space-x-8" id="status-filter-tabs">
+                            <button data-filter="checkedIn" class="status-filter-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm active">已報到</button>
+                            <button data-filter="notCheckedIn" class="status-filter-button whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300">未報到</button>
+                        </nav>
+                    </div>
+
                     <div class="overflow-x-auto">
                         <table class="min-w-full bg-white rounded-lg shadow">
                             <thead class="bg-gray-100">
                                 <tr>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
-                                    <th class="text-left py-3 px-4 font-semibold text-sm">姓名</th>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">報到狀態</th>
-                                    <th class="text-left py-3 px-4 font-semibold text-sm">報到時間</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">報到日期時間</th>
                                 </tr>
                             </thead>
                             <tbody id="status-list" class="text-gray-700"></tbody>
@@ -450,6 +469,7 @@
             let selectedCommunityId = null;
             let selectedCommunityName = null;
             let currentResidents = []; // Store current residents for export
+            let currentStatusFilter = 'checkedIn'; // 'checkedIn' or 'notCheckedIn'
             let communityUnsubscribe = null;
             let configUnsubscribe = null;
             let residentsUnsubscribe = null;
@@ -476,6 +496,15 @@
                 document.querySelector('button[data-tab="setup"]').classList.add('active');
                 document.querySelectorAll('.tab-pane').forEach(p => p.classList.add('hidden'));
                 document.getElementById('setup-tab').classList.remove('hidden');
+                
+                // Reset status filter to default
+                currentStatusFilter = 'checkedIn';
+                const statusTabs = document.getElementById('status-filter-tabs').querySelectorAll('button');
+                statusTabs.forEach(btn => {
+                    btn.classList.toggle('active', btn.dataset.filter === 'checkedIn');
+                    btn.classList.toggle('border-transparent', btn.dataset.filter !== 'checkedIn');
+                    btn.classList.toggle('text-gray-500', btn.dataset.filter !== 'checkedIn');
+                });
             }
 
             function returnToCommunitySelection() {
@@ -723,6 +752,7 @@
                         cardWrapper.className = 'community-card p-6 rounded-lg shadow border border-gray-200 hover:shadow-md hover:border-blue-500 cursor-pointer transition-all relative';
                         cardWrapper.dataset.id = community.id;
                         cardWrapper.dataset.name = community.name;
+                        const createdAtDate = community.createdAt ? new Date(community.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '未知日期';
 
                         cardWrapper.innerHTML = `
                             <button data-id="${community.id}" data-name="${community.name}" class="delete-community-btn absolute top-2 right-2 text-gray-400 hover:text-red-600 focus:outline-none p-1 z-10">
@@ -733,6 +763,7 @@
                                 <div>
                                     <h3 class="text-xl font-bold text-gray-800 pointer-events-none">${community.name}</h3>
                                     <p class="text-sm text-gray-500 pointer-events-none">${community.eventName}</p>
+                                     <p class="text-xs text-gray-400 pointer-events-none mt-1">由 ${community.ownerAccountName || '未知'} 於 ${createdAtDate} 建立</p>
                                 </div>
                             </div>
                         `;
@@ -769,10 +800,12 @@
                 try {
                     const batch = writeBatch(db);
                     const newCommunityRef = doc(collection(db, 'communities'));
+                    const accountName = auth.currentUser.email.split('@')[0];
                     
                     batch.set(newCommunityRef, {
                         name: communityName,
                         ownerId: currentUser.uid,
+                        ownerAccountName: accountName,
                         createdAt: serverTimestamp()
                     });
 
@@ -824,6 +857,7 @@
                 const configData = {
                     eventName: document.getElementById('event-name').value,
                     eventDate: document.getElementById('event-date').value,
+                    ratioThreshold: document.getElementById('event-ratio-threshold').value
                 };
                 await setDoc(configRef, configData);
                 const feedback = document.getElementById('config-feedback');
@@ -997,14 +1031,20 @@
 
             // --- UI Update Functions ---
             function updateConfigUI(data) {
-                document.getElementById('event-name').value = data.eventName || '';
+                const eventNameEl = document.getElementById('event-name');
+                if (!eventNameEl) return; // Guard clause
+
+                eventNameEl.value = data.eventName || '';
                 document.getElementById('event-date').value = data.eventDate || '';
+                document.getElementById('event-ratio-threshold').value = data.ratioThreshold || '';
                 document.getElementById('header-community-name').textContent = selectedCommunityName;
                 document.getElementById('header-event-name').textContent = data.eventName || '尚未設定活動';
             }
 
             function updateResidentsUI(residents) {
                 const list = document.getElementById('resident-list');
+                if (!list) return; // Guard clause
+
                 list.innerHTML = ''; 
                 residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
                     const row = document.createElement('tr');
@@ -1024,25 +1064,60 @@
                 updateQrCodeModal(residents);
             }
             
-            function updateStatusUI(residents) {
-                const total = residents.length;
-                const checkedIn = residents.filter(r => r.isCheckedIn).length;
-                const percentage = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
-
-                document.getElementById('total-residents').textContent = total;
-                document.getElementById('checked-in-count').textContent = checkedIn;
-                document.getElementById('check-in-percentage').textContent = `${percentage}%`;
-                document.getElementById('progress-bar').style.width = `${percentage}%`;
+            const statusFilterTabs = document.getElementById('status-filter-tabs');
+            statusFilterTabs.addEventListener('click', (e) => {
+                const btn = e.target.closest('button.status-filter-button');
+                if (!btn) return;
                 
+                currentStatusFilter = btn.dataset.filter;
+
+                statusFilterTabs.querySelectorAll('button').forEach(b => {
+                    b.classList.remove('active', 'border-blue-500', 'text-blue-600');
+                    b.classList.add('border-transparent', 'text-gray-500', 'hover:text-gray-700', 'hover:border-gray-300');
+                });
+                btn.classList.add('active', 'border-blue-500', 'text-blue-600');
+                btn.classList.remove('border-transparent', 'text-gray-500');
+
+                updateStatusUI(currentResidents);
+            });
+
+            function updateStatusUI(residents) {
+                const totalResidentsEl = document.getElementById('total-residents');
+                if (!totalResidentsEl) return; // Guard clause for the entire function
+
+                const total = residents.length;
+                const checkedInList = residents.filter(r => r.isCheckedIn);
+                const checkedInCount = checkedInList.length;
+                const notCheckedInCount = total - checkedInCount;
+                const checkInPercentage = total > 0 ? Math.round((checkedInCount / total) * 100) : 0;
+
+                const safeParseFloat = (val) => {
+                    const num = parseFloat(val);
+                    return isNaN(num) ? 0 : num;
+                };
+                const totalRatio = residents.reduce((sum, r) => sum + safeParseFloat(r.ratio), 0);
+                const checkedInRatio = checkedInList.reduce((sum, r) => sum + safeParseFloat(r.ratio), 0);
+                const ratioPercentage = totalRatio > 0 ? Math.round((checkedInRatio / totalRatio) * 100) : 0;
+
+                totalResidentsEl.textContent = total;
+                document.getElementById('checked-in-count').textContent = checkedInCount;
+                document.getElementById('not-checked-in-count').textContent = notCheckedInCount;
+                document.getElementById('check-in-percentage').textContent = `${checkInPercentage}%`;
+                document.getElementById('ratio-check-in-percentage').textContent = `${ratioPercentage}%`;
+                document.getElementById('progress-bar').style.width = `${checkInPercentage}%`;
+                
+                const filteredResidents = residents.filter(r => {
+                    return currentStatusFilter === 'checkedIn' ? r.isCheckedIn : !r.isCheckedIn;
+                });
+
                 const list = document.getElementById('status-list');
                 list.innerHTML = '';
-                residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
-                    const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleTimeString('zh-TW') : '---';
+                filteredResidents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                    const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleString('zh-TW', { hour12: false }) : '---';
                     const row = document.createElement('tr');
                     row.className = res.isCheckedIn ? 'bg-green-50' : '';
                     row.innerHTML = `
                         <td class="py-3 px-4">${res.householdId}</td>
-                        <td class="py-3 px-4">${res.name}</td>
                         <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full ${res.isCheckedIn ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}">${res.isCheckedIn ? '已報到' : '未報到'}</span></td>
                         <td class="py-3 px-4">${checkInTime}</td>
                     `;
@@ -1052,6 +1127,8 @@
             
             function updateQrCodeModal(residents) {
                 const qrList = document.getElementById('qrcode-list');
+                 if (!qrList) return; // Guard clause
+
                 qrList.innerHTML = '';
                 residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
                     const item = document.createElement('div');
