@@ -60,16 +60,16 @@
         }
     </style>
 </head>
-<body class="bg-gray-100 flex items-center justify-center min-h-screen">
+<body class="bg-gray-100">
 
-    <div id="app" class="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+    <div id="app-container" class="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden my-4">
 
         <!-- ===== Login View ===== -->
         <div id="login-view" class="p-8">
             <div class="text-center mb-8">
                 <i class="fas fa-qrcode text-5xl text-blue-600"></i>
                 <h1 class="text-3xl font-bold text-gray-800 mt-4">社區報到系統後台</h1>
-                <p class="text-gray-500">請登入以管理報到活動</p>
+                <p class="text-gray-500">請登入以管理您的社區</p>
             </div>
             
             <div class="max-w-sm mx-auto">
@@ -89,7 +89,34 @@
             </div>
         </div>
 
-        <!-- ===== Main App View ===== -->
+        <!-- ===== Community Selection View ===== -->
+        <div id="community-selection-view" class="p-8 hidden">
+            <header class="flex justify-between items-center mb-8">
+                <h1 class="text-3xl font-bold text-gray-800">選擇社區</h1>
+                <button id="logout-btn-main" class="text-gray-500 hover:text-red-600 focus:outline-none">
+                    <i class="fas fa-sign-out-alt mr-1"></i>登出
+                </button>
+            </header>
+            
+            <div id="community-list" class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
+                <!-- Community cards will be inserted here -->
+                <div id="loading-communities" class="text-center p-4 text-gray-500 col-span-full">正在載入您的社區...</div>
+            </div>
+
+            <div class="bg-gray-50 p-6 rounded-lg">
+                <h2 class="text-xl font-semibold text-gray-700 mb-3">建立新社區</h2>
+                <form id="create-community-form" class="flex items-end gap-4">
+                    <div class="flex-grow">
+                        <label for="new-community-name" class="block text-sm font-medium text-gray-700">新社區名稱</label>
+                        <input type="text" id="new-community-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                    </div>
+                    <button type="submit" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500">建立</button>
+                </form>
+                <div id="create-community-error" class="text-red-500 text-sm mt-2"></div>
+            </div>
+        </div>
+
+        <!-- ===== Main App View (Community Specific) ===== -->
         <div id="main-view" class="hidden">
             <!-- Header -->
             <header class="bg-gray-50 p-4 border-b flex justify-between items-center">
@@ -97,9 +124,12 @@
                     <h2 id="header-community-name" class="text-xl font-bold text-gray-800">社區名稱</h2>
                     <p id="header-event-name" class="text-sm text-gray-500">會議活動</p>
                 </div>
-                <button id="logout-btn" class="text-gray-500 hover:text-red-600 focus:outline-none">
-                    <i class="fas fa-sign-out-alt mr-1"></i>登出
-                </button>
+                <div>
+                    <button id="back-to-communities-btn" class="text-sm text-gray-600 hover:text-blue-600 mr-4"><i class="fas fa-arrow-left mr-1"></i>返回社區列表</button>
+                    <button id="logout-btn" class="text-gray-500 hover:text-red-600 focus:outline-none">
+                        <i class="fas fa-sign-out-alt mr-1"></i>登出
+                    </button>
+                </div>
             </header>
 
             <!-- Tabs -->
@@ -116,11 +146,11 @@
             <main id="tab-content" class="p-6" style="min-height: 60vh;">
                 <!-- Setup Tab -->
                 <div id="setup-tab" class="tab-pane">
-                    <h3 class="text-2xl font-semibold mb-4 text-gray-700">活動設定</h3>
+                     <h3 class="text-2xl font-semibold mb-4 text-gray-700">活動設定</h3>
                     <div class="space-y-4 max-w-lg">
                         <div>
-                            <label for="community-name" class="block text-sm font-medium text-gray-700">社區名稱</label>
-                            <input type="text" id="community-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                            <label for="community-name-display" class="block text-sm font-medium text-gray-700">目前管理的社區</label>
+                            <input type="text" id="community-name-display" class="mt-1 block w-full px-3 py-2 border bg-gray-100 border-gray-300 rounded-md" readonly>
                         </div>
                         <div>
                             <label for="event-name" class="block text-sm font-medium text-gray-700">會議/活動名稱</label>
@@ -166,9 +196,7 @@
                                     <th class="text-left py-3 px-4 font-semibold text-sm">操作</th>
                                 </tr>
                             </thead>
-                            <tbody id="resident-list" class="text-gray-700">
-                                <!-- Resident rows will be inserted here -->
-                            </tbody>
+                            <tbody id="resident-list" class="text-gray-700"></tbody>
                         </table>
                     </div>
                 </div>
@@ -188,9 +216,7 @@
                         </div>
                         <div class="w-full md:w-1/2">
                             <h4 class="text-xl font-semibold mb-4 text-gray-700">最近報到紀錄</h4>
-                            <div id="scan-log" class="space-y-2 h-96 overflow-y-auto bg-gray-50 p-3 rounded-lg">
-                                <!-- Scan log entries will be here -->
-                            </div>
+                            <div id="scan-log" class="space-y-2 h-96 overflow-y-auto bg-gray-50 p-3 rounded-lg"></div>
                         </div>
                     </div>
                 </div>
@@ -227,461 +253,435 @@
                                     <th class="text-left py-3 px-4 font-semibold text-sm">報到時間</th>
                                 </tr>
                             </thead>
-                            <tbody id="status-list" class="text-gray-700">
-                                <!-- Status rows will be inserted here -->
-                            </tbody>
+                            <tbody id="status-list" class="text-gray-700"></tbody>
                         </table>
                     </div>
                 </div>
             </main>
         </div>
 
-        <!-- QR Code Modal -->
-        <div id="qrcode-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <!-- Modals and other hidden elements -->
+        <div id="qrcode-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
             <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col">
                 <div class="p-4 border-b flex justify-between items-center">
                     <h3 class="text-xl font-semibold">住戶 QR Code</h3>
                     <div>
                         <button id="print-qrcodes-btn" class="mr-2 bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700"><i class="fas fa-print mr-1"></i>列印</button>
-                        <button id="close-qrcode-modal-btn" class="text-gray-500 hover:text-gray-800">&times;</button>
+                        <button id="close-qrcode-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
                     </div>
                 </div>
                 <div id="qr-code-print-area" class="p-6 overflow-y-auto">
-                    <div id="qrcode-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
-                        <!-- QR codes will be inserted here -->
-                    </div>
+                    <div id="qrcode-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
                 </div>
             </div>
         </div>
-
-        <!-- Confirmation Modal -->
-        <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
             <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6">
-                <h3 id="confirm-modal-title" class="text-lg font-semibold text-gray-800 mb-4">確定要執行此操作嗎？</h3>
-                <p id="confirm-modal-text" class="text-gray-600 mb-6">此動作無法復原。</p>
+                <h3 id="confirm-modal-title" class="text-lg font-semibold text-gray-800 mb-4"></h3>
+                <p id="confirm-modal-text" class="text-gray-600 mb-6"></p>
                 <div class="flex justify-end gap-4">
                     <button id="confirm-modal-cancel-btn" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">取消</button>
-                    <button id="confirm-modal-ok-btn" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700">確定刪除</button>
+                    <button id="confirm-modal-ok-btn" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700"></button>
                 </div>
             </div>
         </div>
-
     </div>
 
     <!-- Firebase SDK -->
     <script type="module">
-        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { 
-            getAuth, 
-            createUserWithEmailAndPassword, 
-            signInWithEmailAndPassword, 
-            onAuthStateChanged, 
-            signOut 
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { 
-            getFirestore, 
-            doc, 
-            getDoc, 
-            setDoc, 
-            addDoc, 
-            collection, 
-            onSnapshot,
-            query,
-            updateDoc,
-            deleteDoc,
-            serverTimestamp
-        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, query, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
-        // IMPORTANT: 請在此處貼上您自己的 Firebase 設定物件
-        // 1. 前往 https://console.firebase.google.com/ 建立一個新的 Firebase 專案。
-        // 2. 在您的專案中，建立一個「網頁」應用程式。
-        // 3. Firebase 會提供一組設定碼 (firebaseConfig)，請將其複製並貼到下方。
-        // 4. **(重要!)** 在 Firebase 主控台中，前往「Authentication」->「Sign-in method」，**啟用「電子郵件/密碼」登入方式**。
-        // 5. 前往「Firestore Database」，建立一個資料庫，並設定安全規則為測試模式 (允許讀寫) 以便開始。
         const firebaseConfig = {
-  apiKey: "AIzaSyA66MZ0dfxSrWgtCiIyNW4GjTo0n1s7psg",
-  authDomain: "nwcom-qrcodecheckin.firebaseapp.com",
-  projectId: "nwcom-qrcodecheckin",
-  storageBucket: "nwcom-qrcodecheckin.firebasestorage.app",
-  messagingSenderId: "700787049117",
-  appId: "1:700787049117:web:13ccf14c5c41abff6b4a74",
-  measurementId: "G-E857BJVJMD"
-};
-        
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-qr-checkin';
+          apiKey: "AIzaSyA66MZ0dfxSrWgtCiIyNW4GjTo0n1s7psg",
+          authDomain: "nwcom-qrcodecheckin.firebaseapp.com",
+          projectId: "nwcom-qrcodecheckin",
+          storageBucket: "nwcom-qrcodecheckin.firebasestorage.app",
+          messagingSenderId: "700787049117",
+          appId: "1:700787049117:web:13ccf14c5c41abff6b4a74",
+          measurementId: "G-E857BJVJMD"
+        };
         
         // --- App Initialization ---
         const loginView = document.getElementById('login-view');
-
-        // 檢查 firebaseConfig 是否已填寫
-        if (firebaseConfig.apiKey === "YOUR_API_KEY" && typeof __firebase_config === 'undefined') {
+        if (firebaseConfig.apiKey === "YOUR_API_KEY") {
             loginView.innerHTML = `
                 <div class="p-8 text-center bg-red-50 rounded-lg">
-                    <h1 class="text-2xl font-bold text-red-700">設定錯誤</h1>
+                    <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                    <h1 class="text-2xl font-bold text-red-700">下一步：請設定 Firebase</h1>
                     <p class="mt-2 text-gray-800">
-                        Firebase 設定尚未完成。請編輯此 HTML 檔案，
-                        在 &lt;script type="module"&gt; 區塊中填入您自己的 Firebase 設定碼 (firebaseConfig)。
+                        您的報到系統尚未與後端資料庫連接。請依照先前提供的教學文件，完成 Firebase 設定，然後將專案的 
+                        <code>firebaseConfig</code> 
+                        設定碼貼入此 HTML 檔案中取代預留位置。
                     </p>
-                    <p class="mt-4 text-sm text-gray-600">
-                        詳細步驟請參考程式碼內的註解說明。
-                    </p>
-                </div>
-            `;
-            throw new Error("Firebase config is not set. Please update the firebaseConfig object in the script.");
-        }
-        
-        const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
-        const app = initializeApp(finalFirebaseConfig);
-        const auth = getAuth(app);
-        const db = getFirestore(app);
+                </div>`;
+        } else {
+            const app = initializeApp(firebaseConfig);
+            const auth = getAuth(app);
+            const db = getFirestore(app);
 
-        // --- DOM Elements ---
-        const mainView = document.getElementById('main-view');
-        const authError = document.getElementById('auth-error');
-        const confirmModal = document.getElementById('confirm-modal');
-        const confirmModalOkBtn = document.getElementById('confirm-modal-ok-btn');
-        const confirmModalCancelBtn = document.getElementById('confirm-modal-cancel-btn');
+            // --- DOM Elements ---
+            const mainView = document.getElementById('main-view');
+            const communitySelectionView = document.getElementById('community-selection-view');
+            const authError = document.getElementById('auth-error');
 
-        // --- State ---
-        let currentUser = null;
-        let configUnsubscribe = null;
-        let residentsUnsubscribe = null;
-        let html5QrCode = null;
-        let confirmResolve = null;
+            // --- State ---
+            let currentUser = null;
+            let selectedCommunityId = null;
+            let selectedCommunityName = null;
+            let communityUnsubscribe = null;
+            let configUnsubscribe = null;
+            let residentsUnsubscribe = null;
+            let html5QrCode = null;
 
-        // --- Confirmation Modal Logic ---
-        function showConfirmModal(title, text, confirmText = '確定') {
-            return new Promise((resolve) => {
-                document.getElementById('confirm-modal-title').textContent = title;
-                document.getElementById('confirm-modal-text').textContent = text;
-                confirmModalOkBtn.textContent = confirmText;
-                confirmModal.classList.remove('hidden');
-                confirmResolve = resolve;
-            });
-        }
-
-        confirmModalOkBtn.addEventListener('click', () => {
-            confirmModal.classList.add('hidden');
-            if (confirmResolve) confirmResolve(true);
-        });
-
-        confirmModalCancelBtn.addEventListener('click', () => {
-            confirmModal.classList.add('hidden');
-            if (confirmResolve) confirmResolve(false);
-        });
-
-        // --- Authentication ---
-        onAuthStateChanged(auth, (user) => {
-            if (user) {
-                currentUser = user;
-                loginView.classList.add('hidden');
-                mainView.classList.remove('hidden');
-                setupListeners();
-            } else {
-                currentUser = null;
-                loginView.classList.remove('hidden');
-                mainView.classList.add('hidden');
-                cleanupListeners();
-            }
-        });
-
-        document.getElementById('login-btn').addEventListener('click', () => {
-            authError.classList.add('hidden');
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-            
-            if (!email || !password) {
-                authError.textContent = '電子郵件和密碼欄位不可空白。';
-                authError.classList.remove('hidden');
-                return;
-            }
-
-            signInWithEmailAndPassword(auth, email, password)
-                .catch(error => handleAuthError(error));
-        });
-
-        document.getElementById('register-btn').addEventListener('click', () => {
-            authError.classList.add('hidden');
-            const email = document.getElementById('email').value;
-            const password = document.getElementById('password').value;
-
-            if (!email || !password) {
-                authError.textContent = '電子郵件和密碼欄位不可空白。';
-                authError.classList.remove('hidden');
-                return;
-            }
-             if (password.length < 6) {
-                authError.textContent = '密碼長度至少需要6個字元。';
-                authError.classList.remove('hidden');
-                return;
-            }
-
-            createUserWithEmailAndPassword(auth, email, password)
-                .catch(error => handleAuthError(error));
-        });
-        
-        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
-
-        function handleAuthError(error) {
-            console.error("Authentication Error:", error);
-            authError.classList.remove('hidden');
-            switch (error.code) {
-                case 'auth/invalid-email':
-                    authError.textContent = '信箱格式錯誤。';
-                    break;
-                case 'auth/user-not-found':
-                case 'auth/wrong-password':
-                    authError.textContent = '信箱或密碼錯誤。';
-                    break;
-                case 'auth/email-already-in-use':
-                    authError.textContent = '此信箱已被註冊。';
-                    break;
-                case 'auth/weak-password':
-                    authError.textContent = '密碼強度不足，至少需要6個字元。';
-                    break;
-                case 'auth/operation-not-allowed':
-                    authError.textContent = '註冊方式未啟用。請前往 Firebase 後台啟用「電子郵件/密碼」登入。';
-                    break;
-                default:
-                    authError.textContent = '發生未知錯誤，請稍後再試。';
-            }
-        }
-        
-        // --- Firestore References ---
-        const configRef = doc(db, `artifacts/${appId}/public/data/config/eventConfig`);
-        const residentsColRef = collection(db, `artifacts/${appId}/public/data/residents`);
-
-        // --- Data Listeners ---
-        function setupListeners() {
-            // Config Listener
-            configUnsubscribe = onSnapshot(configRef, (docSnap) => {
-                const configData = docSnap.exists() ? docSnap.data.js() : {};
-                updateConfigUI(configData);
-            });
-
-            // Residents Listener
-            const q = query(residentsColRef);
-            residentsUnsubscribe = onSnapshot(q, (snapshot) => {
-                const residents = [];
-                snapshot.forEach(doc => residents.push({ id: doc.id, ...doc.data() }));
-                updateResidentsUI(residents);
-                updateStatusUI(residents);
-            });
-        }
-        
-        function cleanupListeners() {
-            if (configUnsubscribe) configUnsubscribe();
-            if (residentsUnsubscribe) residentsUnsubscribe();
-        }
-
-        // --- UI Updates ---
-        function updateConfigUI(data) {
-            document.getElementById('community-name').value = data.communityName || '';
-            document.getElementById('event-name').value = data.eventName || '';
-            document.getElementById('event-date').value = data.eventDate || '';
-            document.getElementById('header-community-name').textContent = data.communityName || '尚未設定社區';
-            document.getElementById('header-event-name').textContent = data.eventName || '尚未設定活動';
-        }
-
-        function updateResidentsUI(residents) {
-            const list = document.getElementById('resident-list');
-            list.innerHTML = ''; // Clear list
-            residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
-                const row = document.createElement('tr');
-                row.innerHTML = `
-                    <td class="py-3 px-4">${res.householdId}</td>
-                    <td class="py-3 px-4">${res.name}</td>
-                    <td class="py-3 px-4">
-                        <button data-id="${res.id}" class="delete-resident-btn text-red-500 hover:text-red-700">
-                            <i class="fas fa-trash-alt"></i>
-                        </button>
-                    </td>
-                `;
-                list.appendChild(row);
-            });
-            // Update QR code modal as well
-            updateQrCodeModal(residents);
-        }
-
-        function updateStatusUI(residents) {
-            const total = residents.length;
-            const checkedIn = residents.filter(r => r.isCheckedIn).length;
-            const percentage = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
-
-            document.getElementById('total-residents').textContent = total;
-            document.getElementById('checked-in-count').textContent = checkedIn;
-            document.getElementById('check-in-percentage').textContent = `${percentage}%`;
-            document.getElementById('progress-bar').style.width = `${percentage}%`;
-            
-            const list = document.getElementById('status-list');
-            list.innerHTML = '';
-            residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
-                const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleTimeString('zh-TW') : '---';
-                const row = document.createElement('tr');
-                row.className = res.isCheckedIn ? 'bg-green-50' : '';
-                row.innerHTML = `
-                    <td class="py-3 px-4">${res.householdId}</td>
-                    <td class="py-3 px-4">${res.name}</td>
-                    <td class="py-3 px-4">
-                        <span class="px-2 py-1 text-xs rounded-full ${res.isCheckedIn ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}">
-                            ${res.isCheckedIn ? '已報到' : '未報到'}
-                        </span>
-                    </td>
-                    <td class="py-3 px-4">${checkInTime}</td>
-                `;
-                list.appendChild(row);
-            });
-        }
-        
-        function updateQrCodeModal(residents) {
-            const qrList = document.getElementById('qrcode-list');
-            qrList.innerHTML = '';
-            residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
-                const item = document.createElement('div');
-                item.className = 'qr-code-item border p-4 rounded-lg text-center flex flex-col items-center justify-center';
-                const qrContainer = document.createElement('div');
-                qrContainer.id = `qr-${res.id}`;
-                qrContainer.className = 'mb-2';
-                item.appendChild(qrContainer);
-                
-                const info = document.createElement('p');
-                info.className = 'font-semibold';
-                info.textContent = `${res.householdId} ${res.name}`;
-                item.appendChild(info);
-                
-                qrList.appendChild(item);
-
-                // Generate QR Code
-                new QRCode(qrContainer, {
-                    text: res.id,
-                    width: 128,
-                    height: 128,
+            // --- App Flow & Navigation ---
+            function showView(viewId) {
+                ['login-view', 'community-selection-view', 'main-view'].forEach(id => {
+                    document.getElementById(id).classList.add('hidden');
                 });
-            });
-        }
+                document.getElementById(viewId).classList.remove('hidden');
+            }
 
-        // --- Event Handlers ---
-        document.getElementById('save-config-btn').addEventListener('click', async () => {
-            const configData = {
-                communityName: document.getElementById('community-name').value,
-                eventName: document.getElementById('event-name').value,
-                eventDate: document.getElementById('event-date').value,
-            };
-            try {
+            function enterCommunity(communityId, communityName) {
+                selectedCommunityId = communityId;
+                selectedCommunityName = communityName;
+                showView('main-view');
+                document.getElementById('community-name-display').value = communityName;
+                setupCommunityListeners();
+            }
+
+            function returnToCommunitySelection() {
+                cleanupCommunityListeners();
+                selectedCommunityId = null;
+                selectedCommunityName = null;
+                stopScanner();
+                showView('community-selection-view');
+            }
+
+            document.getElementById('back-to-communities-btn').addEventListener('click', returnToCommunitySelection);
+
+            // --- Authentication ---
+            onAuthStateChanged(auth, (user) => {
+                if (user) {
+                    currentUser = user;
+                    showView('community-selection-view');
+                    setupCommunityListListener();
+                } else {
+                    currentUser = null;
+                    cleanupCommunityListeners();
+                    cleanupCommunityListListener();
+                    showView('login-view');
+                }
+            });
+            
+            [...document.querySelectorAll('#logout-btn, #logout-btn-main')].forEach(btn => {
+                btn.addEventListener('click', () => signOut(auth));
+            });
+
+            // Re-adding the duplicated login/register listeners as they were outside the new else block
+            document.getElementById('login-btn').addEventListener('click', () => {
+                authError.classList.add('hidden');
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                if (!email || !password) {
+                    authError.textContent = '電子郵件和密碼欄位不可空白。';
+                    authError.classList.remove('hidden');
+                    return;
+                }
+                signInWithEmailAndPassword(auth, email, password).catch(handleAuthError);
+            });
+
+            document.getElementById('register-btn').addEventListener('click', () => {
+                authError.classList.add('hidden');
+                const email = document.getElementById('email').value;
+                const password = document.getElementById('password').value;
+                if (!email || !password) {
+                    authError.textContent = '電子郵件和密碼欄位不可空白。';
+                    authError.classList.remove('hidden');
+                    return;
+                }
+                if (password.length < 6) {
+                    authError.textContent = '密碼長度至少需要6個字元。';
+                    authError.classList.remove('hidden');
+                    return;
+                }
+                createUserWithEmailAndPassword(auth, email, password).catch(handleAuthError);
+            });
+            
+            function handleAuthError(error) {
+                console.error("Authentication Error:", error);
+                authError.classList.remove('hidden');
+                const errorMap = {
+                    'auth/invalid-email': '信箱格式錯誤。',
+                    'auth/user-not-found': '信箱或密碼錯誤。',
+                    'auth/wrong-password': '信箱或密碼錯誤。',
+                    'auth/email-already-in-use': '此信箱已被註冊。',
+                    'auth/weak-password': '密碼強度不足，至少需要6個字元。',
+                    'auth/operation-not-allowed': '註冊方式未啟用。請前往 Firebase 後台啟用「電子郵件/密碼」登入。'
+                };
+                authError.textContent = errorMap[error.code] || '發生未知錯誤，請稍後再試。';
+            }
+
+            // --- Community Management ---
+            function setupCommunityListListener() {
+                if (!currentUser) return;
+                const membershipsRef = collection(db, 'users', currentUser.uid, 'communityMemberships');
+                communityUnsubscribe = onSnapshot(membershipsRef, async (snapshot) => {
+                    document.getElementById('loading-communities').style.display = 'block';
+                    if (snapshot.empty) {
+                        document.getElementById('community-list').innerHTML = '<p class="text-center text-gray-500 col-span-full">您尚未加入任何社區。請建立一個新社區開始使用。</p>';
+                        document.getElementById('loading-communities').style.display = 'none';
+                        return;
+                    }
+
+                    const communityPromises = snapshot.docs.map(docSnap => getDoc(doc(db, 'communities', docSnap.id)));
+                    const communityDocs = await Promise.all(communityPromises);
+                    
+                    const communityListEl = document.getElementById('community-list');
+                    communityListEl.innerHTML = '';
+                    communityDocs.forEach(docSnap => {
+                        if (docSnap.exists()) {
+                            const community = { id: docSnap.id, ...docSnap.data() };
+                            const card = document.createElement('div');
+                            card.className = 'bg-white p-6 rounded-lg shadow border border-gray-200 hover:shadow-md hover:border-blue-500 cursor-pointer transition-all';
+                            card.innerHTML = `
+                                <div class="flex items-center mb-2">
+                                    <i class="fas fa-building text-blue-500 text-2xl mr-4"></i>
+                                    <div>
+                                        <h3 class="text-xl font-bold text-gray-800">${community.name}</h3>
+                                        <p class="text-sm text-gray-400">ID: ${community.id}</p>
+                                    </div>
+                                </div>
+                            `;
+                            card.addEventListener('click', () => enterCommunity(community.id, community.name));
+                            communityListEl.appendChild(card);
+                        }
+                    });
+                    document.getElementById('loading-communities').style.display = 'none';
+                });
+            }
+            
+            function cleanupCommunityListListener() {
+                if (communityUnsubscribe) communityUnsubscribe();
+            }
+
+            document.getElementById('create-community-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const input = document.getElementById('new-community-name');
+                const communityName = input.value.trim();
+                const errorEl = document.getElementById('create-community-error');
+                errorEl.textContent = '';
+
+                if (!communityName) {
+                    errorEl.textContent = '社區名稱不可空白。';
+                    return;
+                }
+
+                try {
+                    // Use a batch write to ensure both operations succeed or fail together
+                    const batch = writeBatch(db);
+                    
+                    // 1. Create the new community document
+                    const newCommunityRef = doc(collection(db, 'communities'));
+                    batch.set(newCommunityRef, {
+                        name: communityName,
+                        ownerId: currentUser.uid,
+                        createdAt: serverTimestamp()
+                    });
+
+                    // 2. Add membership for the current user
+                    const membershipRef = doc(db, 'users', currentUser.uid, 'communityMemberships', newCommunityRef.id);
+                    batch.set(membershipRef, { joinedAt: serverTimestamp() });
+
+                    await batch.commit();
+                    input.value = '';
+
+                } catch (error) {
+                    console.error("Error creating community: ", error);
+                    errorEl.textContent = '建立社區時發生錯誤，請稍後再試。';
+                }
+            });
+
+            // --- Community-Specific Data Listeners & Handlers ---
+            function setupCommunityListeners() {
+                if (!selectedCommunityId) return;
+                const configRef = doc(db, 'communities', selectedCommunityId, 'eventConfig', 'current');
+                const residentsColRef = collection(db, 'communities', selectedCommunityId, 'residents');
+
+                configUnsubscribe = onSnapshot(configRef, (docSnap) => {
+                    const configData = docSnap.exists() ? docSnap.data() : {};
+                    updateConfigUI(configData);
+                });
+
+                residentsUnsubscribe = onSnapshot(query(residentsColRef), (snapshot) => {
+                    const residents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    updateResidentsUI(residents);
+                    updateStatusUI(residents);
+                });
+            }
+
+            function cleanupCommunityListeners() {
+                if (configUnsubscribe) configUnsubscribe();
+                if (residentsUnsubscribe) residentsUnsubscribe();
+            }
+
+            document.getElementById('save-config-btn').addEventListener('click', async () => {
+                const configRef = doc(db, 'communities', selectedCommunityId, 'eventConfig', 'current');
+                const configData = {
+                    eventName: document.getElementById('event-name').value,
+                    eventDate: document.getElementById('event-date').value,
+                };
                 await setDoc(configRef, configData);
                 const feedback = document.getElementById('config-feedback');
                 feedback.textContent = '設定已成功儲存！';
                 setTimeout(() => feedback.textContent = '', 3000);
-            } catch (e) {
-                console.error("Error saving config:", e);
-                // Cannot use alert
-            }
-        });
+            });
 
-        document.getElementById('add-resident-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const householdInput = document.getElementById('resident-household');
-            const nameInput = document.getElementById('resident-name');
-            const newResident = {
-                householdId: householdInput.value.trim(),
-                name: nameInput.value.trim(),
-                isCheckedIn: false,
-                checkInTime: null,
-            };
-            if (newResident.householdId && newResident.name) {
-                try {
+            document.getElementById('add-resident-form').addEventListener('submit', async (e) => {
+                e.preventDefault();
+                const residentsColRef = collection(db, 'communities', selectedCommunityId, 'residents');
+                const householdInput = document.getElementById('resident-household');
+                const nameInput = document.getElementById('resident-name');
+                const newResident = {
+                    householdId: householdInput.value.trim(),
+                    name: nameInput.value.trim(),
+                    isCheckedIn: false,
+                    checkInTime: null,
+                };
+                if (newResident.householdId && newResident.name) {
                     await addDoc(residentsColRef, newResident);
                     householdInput.value = '';
                     nameInput.value = '';
                     householdInput.focus();
-                } catch(e) {
-                    console.error("Error adding resident: ", e);
                 }
-            }
-        });
+            });
 
-        document.getElementById('resident-list').addEventListener('click', async (e) => {
-            if (e.target.closest('.delete-resident-btn')) {
+            // Event delegation for deleting resident
+            document.getElementById('resident-list').addEventListener('click', async (e) => {
                 const btn = e.target.closest('.delete-resident-btn');
-                const residentId = btn.dataset.id;
-                const confirmed = await showConfirmModal('刪除住戶', '您確定要刪除這位住戶嗎？', '確定刪除');
-                if (confirmed) {
-                    try {
-                        await deleteDoc(doc(db, `artifacts/${appId}/public/data/residents`, residentId));
-                    } catch (e) {
-                        console.error("Error deleting resident: ", e);
+                if (btn) {
+                    const residentId = btn.dataset.id;
+                    const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', residentId);
+                    const confirmed = await showConfirmModal('刪除住戶', '您確定要刪除這位住戶嗎？', '確定刪除');
+                    if (confirmed) {
+                        await deleteDoc(residentRef);
                     }
                 }
+            });
+
+            // --- UI Update Functions (mostly unchanged, but now scoped) ---
+            function updateConfigUI(data) {
+                document.getElementById('event-name').value = data.eventName || '';
+                document.getElementById('event-date').value = data.eventDate || '';
+                document.getElementById('header-community-name').textContent = selectedCommunityName;
+                document.getElementById('header-event-name').textContent = data.eventName || '尚未設定活動';
             }
-        });
 
-        // --- Tabs Navigation ---
-        const tabs = document.getElementById('tabs');
-        const tabPanes = document.querySelectorAll('.tab-pane');
-        tabs.addEventListener('click', (e) => {
-            if (e.target.tagName === 'BUTTON') {
-                const tabId = e.target.dataset.tab;
-                
-                tabs.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
-                e.target.classList.add('active');
-
-                tabPanes.forEach(pane => {
-                    if (pane.id === `${tabId}-tab`) {
-                        pane.classList.remove('hidden');
-                    } else {
-                        pane.classList.add('hidden');
-                    }
+            function updateResidentsUI(residents) {
+                const list = document.getElementById('resident-list');
+                list.innerHTML = ''; 
+                residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                    const row = document.createElement('tr');
+                    row.innerHTML = `
+                        <td class="py-3 px-4">${res.householdId}</td>
+                        <td class="py-3 px-4">${res.name}</td>
+                        <td class="py-3 px-4">
+                            <button data-id="${res.id}" class="delete-resident-btn text-red-500 hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
+                        </td>
+                    `;
+                    list.appendChild(row);
                 });
-
-                // Handle scanner logic on tab change
-                if (tabId === 'scanner') {
-                    startScanner();
-                } else {
-                    stopScanner();
-                }
+                updateQrCodeModal(residents);
             }
-        });
-
-        // --- QR Code Scanner Logic ---
-        function startScanner() {
-            if (html5QrCode && html5QrCode.isScanning) {
-                return;
-            }
-            html5QrCode = new Html5Qrcode("reader");
-            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
             
-            document.getElementById('scanner-error').textContent = '正在啟動攝影機...';
-            document.getElementById('stop-scanner-btn').classList.remove('hidden');
+            function updateStatusUI(residents) {
+                const total = residents.length;
+                const checkedIn = residents.filter(r => r.isCheckedIn).length;
+                const percentage = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
 
-            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
-                .then(() => {
-                    document.getElementById('scanner-error').textContent = '';
-                })
-                .catch(err => {
-                    document.getElementById('scanner-error').textContent = `無法啟動攝影機: ${err}`;
-                    console.error("Camera start error:", err);
+                document.getElementById('total-residents').textContent = total;
+                document.getElementById('checked-in-count').textContent = checkedIn;
+                document.getElementById('check-in-percentage').textContent = `${percentage}%`;
+                document.getElementById('progress-bar').style.width = `${percentage}%`;
+                
+                const list = document.getElementById('status-list');
+                list.innerHTML = '';
+                residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                    const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleTimeString('zh-TW') : '---';
+                    const row = document.createElement('tr');
+                    row.className = res.isCheckedIn ? 'bg-green-50' : '';
+                    row.innerHTML = `
+                        <td class="py-3 px-4">${res.householdId}</td>
+                        <td class="py-3 px-4">${res.name}</td>
+                        <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full ${res.isCheckedIn ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}">${res.isCheckedIn ? '已報到' : '未報到'}</span></td>
+                        <td class="py-3 px-4">${checkInTime}</td>
+                    `;
+                    list.appendChild(row);
                 });
-        }
-        
-        function stopScanner() {
-            if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().then(() => {
-                    console.log("Scanner stopped.");
-                    document.getElementById('stop-scanner-btn').classList.add('hidden');
-                }).catch(err => console.error("Scanner stop failed", err));
             }
-        }
-        
-        document.getElementById('stop-scanner-btn').addEventListener('click', stopScanner);
+            
+            function updateQrCodeModal(residents) {
+                const qrList = document.getElementById('qrcode-list');
+                qrList.innerHTML = '';
+                residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                    const item = document.createElement('div');
+                    item.className = 'qr-code-item border p-4 rounded-lg text-center flex flex-col items-center justify-center';
+                    const qrContainer = document.createElement('div');
+                    qrContainer.id = `qr-${res.id}`;
+                    qrContainer.className = 'mb-2';
+                    item.appendChild(qrContainer);
+                    const info = document.createElement('p');
+                    info.className = 'font-semibold';
+                    info.textContent = `${res.householdId} ${res.name}`;
+                    item.appendChild(info);
+                    qrList.appendChild(item);
+                    new QRCode(qrContainer, { text: res.id, width: 128, height: 128 });
+                });
+            }
 
-        async function onScanSuccess(decodedText, decodedResult) {
-            // Pause scanner to prevent multiple scans of the same code
-            if (html5QrCode.isScanning) html5QrCode.pause();
+            // --- Tabs, Scanner, Modals (mostly unchanged logic, just call sites) ---
+            const tabs = document.getElementById('tabs');
+            tabs.addEventListener('click', (e) => {
+                const btn = e.target.closest('button');
+                if (btn) {
+                    const tabId = btn.dataset.tab;
+                    tabs.querySelectorAll('button').forEach(b => b.classList.remove('active'));
+                    btn.classList.add('active');
+                    document.querySelectorAll('.tab-pane').forEach(pane => {
+                        pane.classList.toggle('hidden', pane.id !== `${tabId}-tab`);
+                    });
+                    if (tabId === 'scanner') startScanner();
+                    else stopScanner();
+                }
+            });
 
-            try {
-                const residentRef = doc(db, `artifacts/${appId}/public/data/residents`, decodedText);
+            // QR Code Scanner Logic
+            function startScanner() {
+                if (html5QrCode && html5QrCode.isScanning) return;
+                html5QrCode = new Html5Qrcode("reader");
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                document.getElementById('scanner-error').textContent = '正在啟動攝影機...';
+                document.getElementById('stop-scanner-btn').classList.remove('hidden');
+                html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, (err) => {})
+                    .then(() => document.getElementById('scanner-error').textContent = '')
+                    .catch(err => document.getElementById('scanner-error').textContent = `無法啟動攝影機: ${err}`);
+            }
+
+            function stopScanner() {
+                if (html5QrCode && html5QrCode.isScanning) {
+                    html5QrCode.stop().then(() => {
+                        document.getElementById('stop-scanner-btn').classList.add('hidden');
+                    }).catch(err => console.error("Scanner stop failed", err));
+                }
+            }
+            document.getElementById('stop-scanner-btn').addEventListener('click', stopScanner);
+
+            async function onScanSuccess(decodedText, decodedResult) {
+                if (html5QrCode.isScanning) html5QrCode.pause();
+                
+                const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', decodedText);
                 const residentSnap = await getDoc(residentRef);
 
                 if (residentSnap.exists()) {
@@ -690,10 +690,7 @@
                         showFeedback('重複報到', `${residentData.householdId} ${residentData.name} 已報到過。`, 'orange');
                         addScanLog(`${residentData.householdId} ${residentData.name}`, '重複報到', 'orange');
                     } else {
-                        await updateDoc(residentRef, {
-                            isCheckedIn: true,
-                            checkInTime: serverTimestamp()
-                        });
+                        await updateDoc(residentRef, { isCheckedIn: true, checkInTime: serverTimestamp() });
                         showFeedback('報到成功', `${residentData.householdId} ${residentData.name}`, 'green');
                         addScanLog(`${residentData.householdId} ${residentData.name}`, '報到成功', 'green');
                     }
@@ -701,88 +698,57 @@
                     showFeedback('無效的 QR Code', '找不到對應的住戶資料。', 'red');
                     addScanLog(`無效的 Code: ${decodedText.substring(0, 8)}...`, '查無資料', 'red');
                 }
-            } catch (e) {
-                console.error("Error processing scan:", e);
-                showFeedback('處理錯誤', '發生網路或資料庫錯誤。', 'red');
+
+                setTimeout(() => {
+                    if (html5QrCode && typeof html5QrCode.getState === 'function' && html5QrCode.getState() === 2) {
+                        html5QrCode.resume();
+                    }
+                }, 2000);
             }
 
-            // Resume scanner after a short delay
-            setTimeout(() => {
-                // Check if scanner exists and its state is paused
-                if (html5QrCode && typeof html5QrCode.getState === 'function' && html5QrCode.getState() === 2) { // 2 corresponds to PAUSED state
-                    html5QrCode.resume();
-                }
-            }, 2000);
-        }
-
-
-        function onScanFailure(error) {
-            // This is called frequently, so we don't log every failure.
-            // console.warn(`Code scan error = ${error}`);
-        }
-        
-        function showFeedback(title, message, color) {
-            const overlay = document.getElementById('feedback-overlay');
-            const colorClasses = {
-                green: 'bg-green-500',
-                orange: 'bg-orange-500',
-                red: 'bg-red-500'
-            };
-            const iconClasses = {
-                green: 'fa-check-circle',
-                orange: 'fa-exclamation-triangle',
-                red: 'fa-times-circle'
+            // Feedback and Log UI
+            function showFeedback(title, message, color) {
+                const overlay = document.getElementById('feedback-overlay');
+                const colors = { green: 'bg-green-500', orange: 'bg-orange-500', red: 'bg-red-500' };
+                const icons = { green: 'fa-check-circle', orange: 'fa-exclamation-triangle', red: 'fa-times-circle' };
+                const feedbackDiv = document.createElement('div');
+                feedbackDiv.className = `feedback-animation text-white p-6 rounded-lg shadow-2xl text-center ${colors[color]}`;
+                feedbackDiv.innerHTML = `<i class="fas ${icons[color]} text-5xl mb-3"></i><h3 class="text-2xl font-bold">${title}</h3><p class="text-lg">${message}</p>`;
+                overlay.innerHTML = '';
+                overlay.appendChild(feedbackDiv);
+                setTimeout(() => { if (overlay.contains(feedbackDiv)) overlay.removeChild(feedbackDiv); }, 2800);
+            }
+            function addScanLog(text, status, color) {
+                const logContainer = document.getElementById('scan-log');
+                const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+                const colors = { green: 'border-green-500', orange: 'border-orange-500', red: 'border-red-500' };
+                const logEntry = document.createElement('div');
+                logEntry.className = `p-2 border-l-4 ${colors[color]} bg-white rounded-r-lg shadow-sm`;
+                logEntry.innerHTML = `<div class="flex justify-between items-center"><span class="font-medium text-gray-800">${text}</span><span class="text-xs text-gray-500">${time}</span></div><p class="text-sm text-gray-600">${status}</p>`;
+                logContainer.prepend(logEntry);
+                if (logContainer.children.length > 50) logContainer.removeChild(logContainer.lastChild);
             }
 
-            const feedbackDiv = document.createElement('div');
-            feedbackDiv.className = `feedback-animation text-white p-6 rounded-lg shadow-2xl text-center ${colorClasses[color]}`;
-            feedbackDiv.innerHTML = `
-                <i class="fas ${iconClasses[color]} text-5xl mb-3"></i>
-                <h3 class="text-2xl font-bold">${title}</h3>
-                <p class="text-lg">${message}</p>
-            `;
-            
-            overlay.innerHTML = ''; // Clear previous
-            overlay.appendChild(feedbackDiv);
-            
-            setTimeout(() => {
-                if(overlay.contains(feedbackDiv)){
-                   overlay.removeChild(feedbackDiv);
-                }
-            }, 2800);
-        }
-        
-        function addScanLog(text, status, color) {
-            const logContainer = document.getElementById('scan-log');
-            const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
-            const colorClasses = {
-                green: 'border-green-500',
-                orange: 'border-orange-500',
-                red: 'border-red-500'
-            };
-            
-            const logEntry = document.createElement('div');
-            logEntry.className = `p-2 border-l-4 ${colorClasses[color]} bg-white rounded-r-lg shadow-sm`;
-            logEntry.innerHTML = `
-                <div class="flex justify-between items-center">
-                    <span class="font-medium text-gray-800">${text}</span>
-                    <span class="text-xs text-gray-500">${time}</span>
-                </div>
-                <p class="text-sm text-gray-600">${status}</p>
-            `;
-            logContainer.prepend(logEntry);
-            // Keep log from growing too large
-            if (logContainer.children.length > 50) {
-                logContainer.removeChild(logContainer.lastChild);
+            // Modal Logic
+            const qrModal = document.getElementById('qrcode-modal');
+            document.getElementById('view-qrcodes-btn').addEventListener('click', () => qrModal.classList.remove('hidden'));
+            document.getElementById('close-qrcode-modal-btn').addEventListener('click', () => qrModal.classList.add('hidden'));
+            document.getElementById('print-qrcodes-btn').addEventListener('click', () => window.print());
+
+            let confirmResolve = null;
+            const confirmModal = document.getElementById('confirm-modal');
+            function showConfirmModal(title, text, confirmText) {
+                return new Promise((resolve) => {
+                    document.getElementById('confirm-modal-title').textContent = title;
+                    document.getElementById('confirm-modal-text').textContent = text;
+                    document.getElementById('confirm-modal-ok-btn').textContent = confirmText;
+                    confirmModal.classList.remove('hidden');
+                    confirmResolve = resolve;
+                });
             }
+            document.getElementById('confirm-modal-ok-btn').addEventListener('click', () => { confirmModal.classList.add('hidden'); if(confirmResolve) confirmResolve(true); });
+            document.getElementById('confirm-modal-cancel-btn').addEventListener('click', () => { confirmModal.classList.add('hidden'); if(confirmResolve) confirmResolve(false); });
         }
-
-        // --- QR Code Modal ---
-        const qrModal = document.getElementById('qrcode-modal');
-        document.getElementById('view-qrcodes-btn').addEventListener('click', () => qrModal.classList.remove('hidden'));
-        document.getElementById('close-qrcode-modal-btn').addEventListener('click', () => qrModal.classList.add('hidden'));
-        document.getElementById('print-qrcodes-btn').addEventListener('click', () => window.print());
-
     </script>
 </body>
 </html>
