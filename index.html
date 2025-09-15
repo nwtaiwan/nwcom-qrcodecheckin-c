@@ -1084,39 +1084,45 @@
                 html5QrCode = new Html5Qrcode("reader");
                 const config = { fps: 10, qrbox: { width: 250, height: 250 } };
                 const scannerErrorEl = document.getElementById('scanner-error');
-                scannerErrorEl.textContent = '正在啟動攝影機...';
+                scannerErrorEl.textContent = '正在請求攝影機權限...';
 
                 try {
-                    const devices = await Html5Qrcode.getCameras();
-                    if (devices && devices.length) {
-                        let cameraId = devices[0].id;
-                        const backCamera = devices.find(device => device.label.toLowerCase().includes('back'));
-                        if (backCamera) {
-                            cameraId = backCamera.id;
-                        }
-                        
-                        document.getElementById('stop-scanner-btn').classList.remove('hidden');
-                        await html5QrCode.start(
-                            cameraId,
-                            config,
-                            onScanSuccess,
-                            (err) => {}
-                        );
-                        scannerErrorEl.textContent = '';
-                    } else {
-                        // Fallback for browsers without getCameras or with no cameras
-                         document.getElementById('stop-scanner-btn').classList.remove('hidden');
-                         await html5QrCode.start(
-                            { facingMode: "environment" },
-                            config,
-                            onScanSuccess,
-                            (err) => {}
-                        );
-                         scannerErrorEl.textContent = '';
+                    const cameras = await Html5Qrcode.getCameras();
+                    if (!cameras || cameras.length === 0) {
+                        scannerErrorEl.textContent = '找不到攝影機設備。';
+                        return;
                     }
+
+                    let cameraId;
+                    // Prefer back camera if available (for mobile)
+                    const backCamera = cameras.find(camera => camera.label.toLowerCase().includes('back') || camera.label.toLowerCase().includes('後置'));
+                    if (backCamera) {
+                        cameraId = backCamera.id;
+                    } else {
+                        // Otherwise, use the first available camera (for desktops/laptops)
+                        cameraId = cameras[0].id;
+                    }
+
+                    scannerErrorEl.textContent = '正在啟動攝影機...';
+                    document.getElementById('stop-scanner-btn').classList.remove('hidden');
+
+                    await html5QrCode.start(
+                        cameraId,      // Use the specific camera ID
+                        config,
+                        onScanSuccess, // success callback
+                        (errorMessage) => {
+                            // parse error, ignore.
+                        }
+                    );
+                    scannerErrorEl.textContent = ''; // Clear status message on success
+
                 } catch (err) {
-                    scannerErrorEl.textContent = `無法啟動攝影機: ${err}. 請確認瀏覽器權限。`;
-                    console.error("Camera start error:", err);
+                    if (err.name === 'NotAllowedError') {
+                         scannerErrorEl.textContent = '攝影機權限被拒絕。請至瀏覽器設定中允許本網站使用攝影機。';
+                    } else {
+                         scannerErrorEl.textContent = `無法啟動攝影機: ${err}`;
+                    }
+                    console.error("Camera initialization error:", err);
                 }
             }
 
