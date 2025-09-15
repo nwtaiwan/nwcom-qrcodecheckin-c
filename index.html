@@ -274,7 +274,15 @@
 
                 <!-- Status Tab -->
                 <div id="status-tab" class="tab-pane hidden">
-                    <h3 class="text-2xl font-semibold mb-4 text-gray-700">即時報到狀況</h3>
+                    <div class="flex justify-between items-center mb-4">
+                        <div class="flex items-center gap-4">
+                             <h3 class="text-2xl font-semibold text-gray-700">即時報到狀況</h3>
+                             <span id="quorum-met-indicator" class="hidden text-green-600 font-bold text-lg">已達法定開會人數</span>
+                        </div>
+                        <button id="share-status-btn" class="text-blue-600 hover:text-blue-800">
+                            <i class="fas fa-share-alt text-xl"></i>
+                        </button>
+                    </div>
                     <div class="bg-gray-50 p-4 rounded-lg mb-6 shadow grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                         <div>
                             <p class="text-sm text-gray-500">總戶數</p>
@@ -308,12 +316,8 @@
 
                     <div class="overflow-x-auto">
                         <table class="min-w-full bg-white rounded-lg shadow">
-                            <thead class="bg-gray-100">
-                                <tr>
-                                    <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
-                                    <th class="text-left py-3 px-4 font-semibold text-sm">報到狀態</th>
-                                    <th class="text-left py-3 px-4 font-semibold text-sm">報到日期時間</th>
-                                </tr>
+                            <thead id="status-table-head" class="bg-gray-100">
+                                <!-- Headers will be dynamically inserted here -->
                             </thead>
                             <tbody id="status-list" class="text-gray-700"></tbody>
                         </table>
@@ -355,6 +359,11 @@
             </main>
         </div>
 
+        <!-- ===== Public Status View ===== -->
+        <div id="public-status-view" class="p-8 hidden">
+             <!-- Content will be injected here -->
+        </div>
+
         <!-- Modals and other hidden elements -->
         <div id="qrcode-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
             <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col">
@@ -368,6 +377,21 @@
                 <div id="qr-code-print-area" class="p-6 overflow-y-auto">
                     <div id="qrcode-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6"></div>
                 </div>
+            </div>
+        </div>
+        <div id="share-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6">
+                <div class="flex justify-between items-center mb-4">
+                    <h3 class="text-lg font-semibold text-gray-800">分享即時報到狀況</h3>
+                    <button id="close-share-modal-btn" class="text-gray-500 hover:text-gray-800 text-2xl leading-none">&times;</button>
+                </div>
+                <p class="text-sm text-gray-600 mb-4">任何人都可以透過以下連結或 QR Code 查看此活動的即時報到統計，無需登入。</p>
+                <div id="share-qrcode" class="flex justify-center mb-4"></div>
+                <div class="mb-4">
+                    <label for="share-url" class="block text-xs font-medium text-gray-500">公開連結</label>
+                    <input type="text" id="share-url" class="mt-1 block w-full px-3 py-2 border bg-gray-100 border-gray-300 rounded-md shadow-sm text-sm" readonly>
+                </div>
+                <button id="copy-share-url-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">複製連結</button>
             </div>
         </div>
         <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
@@ -409,35 +433,122 @@
         };
         
         // --- App Initialization ---
-        const loginView = document.getElementById('login-view');
-        if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.apiKey) {
-            loginView.innerHTML = `
-                <div class="p-8 text-center bg-red-50 rounded-lg">
-                    <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-                    <h1 class="text-2xl font-bold text-red-700">下一步：請設定 Firebase</h1>
-                    <p class="mt-2 text-gray-800">
-                        您的報到系統尚未與後端資料庫連接。請依照先前提供的教學文件，完成 Firebase 設定，然後將專案的 
-                        <code>firebaseConfig</code> 
-                        設定碼貼入此 HTML 檔案中取代預留位置。
-                    </p>
-                </div>`;
-        } else {
-            const app = initializeApp(firebaseConfig);
-            const auth = getAuth(app);
-            const db = getFirestore(app);
-            // Secondary app for user creation to not interfere with admin's session
-            const secondaryApp = initializeApp(firebaseConfig, "secondary-app-for-user-creation");
-            const secondaryAuth = getAuth(secondaryApp);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        // Secondary app for user creation to not interfere with admin's session
+        const secondaryApp = initializeApp(firebaseConfig, "secondary-app-for-user-creation");
+        const secondaryAuth = getAuth(secondaryApp);
 
-            // --- Audio Feedback Setup ---
-            function speak(text) {
-                if ('speechSynthesis' in window) {
-                    window.speechSynthesis.cancel(); // Stop any previous speech
-                    const utterance = new SpeechSynthesisUtterance(text);
-                    utterance.lang = 'zh-TW'; // Set language to Taiwanese Mandarin
-                    utterance.rate = 1.2;
-                    window.speechSynthesis.speak(utterance);
-                }
+
+        // --- Public View Logic ---
+        const urlParams = new URLSearchParams(window.location.search);
+        const publicCommunityId = urlParams.get('public_status');
+
+        if (publicCommunityId) {
+             // Show only the public view and hide the main app
+            document.getElementById('app-container').classList.add('hidden');
+            const publicViewContainer = document.createElement('div');
+            publicViewContainer.id = 'public-view-container';
+            publicViewContainer.className = 'w-full max-w-2xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden my-4 p-8';
+            document.body.appendChild(publicViewContainer);
+
+            publicViewContainer.innerHTML = `<p class="text-center text-gray-500">正在載入即時報到狀況...</p>`;
+
+            // IMPORTANT: For this public view to work, you MUST set Firestore Security Rules
+            // to allow public reads on the 'communities/{communityId}/eventConfig/current'
+            // and 'communities/{communityId}/residents' paths.
+            // Example Rule:
+            // match /communities/{communityId}/{document=**} {
+            //   allow read: if true;
+            //   allow write: if request.auth != null; // Or more specific rules
+            // }
+
+            const communityRef = doc(db, 'communities', publicCommunityId);
+            const configRef = doc(db, 'communities', publicCommunityId, 'eventConfig', 'current');
+            const residentsColRef = collection(db, 'communities', publicCommunityId, 'residents');
+
+            let configData = {};
+            let publicResidents = [];
+            
+            const communitySnap = await getDoc(communityRef);
+            if (!communitySnap.exists()) {
+                 publicViewContainer.innerHTML = `<p class="text-center text-red-500">找不到指定的活動資料。</p>`;
+            } else {
+                 onSnapshot(configRef, (docSnap) => {
+                    configData = docSnap.exists() ? docSnap.data() : {};
+                    renderPublicStatus(communitySnap.data(), configData, publicResidents, publicViewContainer);
+                 });
+                 onSnapshot(query(residentsColRef), (snapshot) => {
+                    publicResidents = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                    renderPublicStatus(communitySnap.data(), configData, publicResidents, publicViewContainer);
+                 });
+            }
+
+        } else {
+            // --- App Initialization (Private/Logged-in view) ---
+            initializeAppLogic();
+        }
+
+        function renderPublicStatus(communityData, configData, residents, container) {
+            const total = residents.length;
+            const checkedInList = residents.filter(r => r.isCheckedIn);
+            const checkedInCount = checkedInList.length;
+            const notCheckedInCount = total - checkedInCount;
+
+            const safeParseFloat = (val) => {
+                const num = parseFloat(val);
+                return isNaN(num) ? 0 : num;
+            };
+            const totalRatio = residents.reduce((sum, r) => sum + safeParseFloat(r.ratio), 0);
+            const checkedInRatio = checkedInList.reduce((sum, r) => sum + safeParseFloat(r.ratio), 0);
+            const ratioPercentage = totalRatio > 0 ? Math.round((checkedInRatio / totalRatio) * 100) : 0;
+            const threshold = safeParseFloat(configData.ratioThreshold);
+            const isQuorumMet = threshold > 0 && ratioPercentage >= threshold;
+
+            container.innerHTML = `
+                <div class="text-center mb-6">
+                    <h1 class="text-2xl font-bold text-gray-800">${communityData.name}</h1>
+                    <p class="text-lg text-gray-600">${configData.eventName || '報到狀況'}</p>
+                    <p class="text-sm text-gray-400">最後更新: ${new Date().toLocaleTimeString('zh-TW')}</p>
+                </div>
+                 <div class="bg-gray-50 p-4 rounded-lg mb-6 shadow grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+                    <div>
+                        <p class="text-sm text-gray-500">總戶數</p>
+                        <p class="text-3xl font-bold text-gray-800">${total}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">已報到</p>
+                        <p class="text-3xl font-bold text-green-600">${checkedInCount}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">未報到</p>
+                        <p class="text-3xl font-bold text-red-600">${notCheckedInCount}</p>
+                    </div>
+                    <div>
+                        <p class="text-sm text-gray-500">區分權報到率</p>
+                        <p class="text-3xl font-bold text-purple-600">${ratioPercentage}%</p>
+                    </div>
+                </div>
+                ${isQuorumMet ? '<p class="text-center text-2xl font-bold text-green-600 my-4">已達法定開會人數</p>' : ''}
+            `;
+        }
+
+
+        function initializeAppLogic() {
+            const loginView = document.getElementById('login-view');
+            if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.apiKey) {
+                loginView.innerHTML = `
+                    <div class="p-8 text-center bg-red-50 rounded-lg">
+                        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
+                        <h1 class="text-2xl font-bold text-red-700">下一步：請設定 Firebase</h1>
+                        <p class="mt-2 text-gray-800">
+                            您的報到系統尚未與後端資料庫連接。請依照先前提供的教學文件，完成 Firebase 設定，然後將專案的 
+                            <code>firebaseConfig</code> 
+                            設定碼貼入此 HTML 檔案中取代預留位置。
+                        </p>
+                    </div>`;
+                return;
             }
 
             // --- Login UI Enhancements ---
@@ -468,6 +579,7 @@
             let currentUser = null;
             let selectedCommunityId = null;
             let selectedCommunityName = null;
+            let currentEventConfig = {};
             let currentResidents = []; // Store current residents for export
             let currentStatusFilter = 'checkedIn'; // 'checkedIn' or 'notCheckedIn'
             let communityUnsubscribe = null;
@@ -834,8 +946,9 @@
 
                 if (configUnsubscribe) configUnsubscribe();
                 configUnsubscribe = onSnapshot(configRef, (docSnap) => {
-                    const configData = docSnap.exists() ? docSnap.data() : {};
-                    updateConfigUI(configData);
+                    currentEventConfig = docSnap.exists() ? docSnap.data() : {};
+                    updateConfigUI(currentEventConfig);
+                    updateStatusUI(currentResidents); // Recalculate status when config changes
                 });
 
                 if (residentsUnsubscribe) residentsUnsubscribe();
@@ -1106,23 +1219,54 @@
                 document.getElementById('ratio-check-in-percentage').textContent = `${ratioPercentage}%`;
                 document.getElementById('progress-bar').style.width = `${checkInPercentage}%`;
                 
-                const filteredResidents = residents.filter(r => {
-                    return currentStatusFilter === 'checkedIn' ? r.isCheckedIn : !r.isCheckedIn;
-                });
+                // Update quorum met indicator
+                const threshold = safeParseFloat(currentEventConfig.ratioThreshold);
+                const quorumIndicator = document.getElementById('quorum-met-indicator');
+                if (threshold > 0 && ratioPercentage >= threshold) {
+                    quorumIndicator.classList.remove('hidden');
+                } else {
+                    quorumIndicator.classList.add('hidden');
+                }
 
+
+                const tableHead = document.getElementById('status-table-head');
                 const list = document.getElementById('status-list');
-                list.innerHTML = '';
-                filteredResidents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
-                    const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleString('zh-TW', { hour12: false }) : '---';
-                    const row = document.createElement('tr');
-                    row.className = res.isCheckedIn ? 'bg-green-50' : '';
-                    row.innerHTML = `
-                        <td class="py-3 px-4">${res.householdId}</td>
-                        <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full ${res.isCheckedIn ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}">${res.isCheckedIn ? '已報到' : '未報到'}</span></td>
-                        <td class="py-3 px-4">${checkInTime}</td>
-                    `;
-                    list.appendChild(row);
-                });
+                
+                if (currentStatusFilter === 'checkedIn') {
+                    tableHead.innerHTML = `
+                        <tr>
+                            <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
+                            <th class="text-left py-3 px-4 font-semibold text-sm">報到狀態</th>
+                            <th class="text-left py-3 px-4 font-semibold text-sm">報到日期時間</th>
+                        </tr>`;
+                    list.innerHTML = '';
+                    checkedInList.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                        const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleString('zh-TW', { hour12: false }) : '---';
+                        const row = document.createElement('tr');
+                        row.className = 'bg-green-50';
+                        row.innerHTML = `
+                            <td class="py-3 px-4">${res.householdId}</td>
+                            <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full bg-green-200 text-green-800">已報到</span></td>
+                            <td class="py-3 px-4">${checkInTime}</td>
+                        `;
+                        list.appendChild(row);
+                    });
+                } else { // notCheckedIn
+                     tableHead.innerHTML = `
+                        <tr>
+                            <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
+                            <th class="text-left py-3 px-4 font-semibold text-sm">報到狀態</th>
+                        </tr>`;
+                    list.innerHTML = '';
+                    residents.filter(r => !r.isCheckedIn).sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                        const row = document.createElement('tr');
+                        row.innerHTML = `
+                            <td class="py-3 px-4">${res.householdId}</td>
+                            <td class="py-3 px-4"><span class="px-2 py-1 text-xs rounded-full bg-gray-200 text-gray-800">未報到</span></td>
+                        `;
+                        list.appendChild(row);
+                    });
+                }
             }
             
             function updateQrCodeModal(residents) {
@@ -1282,6 +1426,25 @@
             document.getElementById('view-qrcodes-btn').addEventListener('click', () => qrModal.classList.remove('hidden'));
             document.getElementById('close-qrcode-modal-btn').addEventListener('click', () => qrModal.classList.add('hidden'));
             document.getElementById('print-qrcodes-btn').addEventListener('click', () => window.print());
+
+            const shareModal = document.getElementById('share-modal');
+            document.getElementById('share-status-btn').addEventListener('click', () => {
+                const url = `${window.location.origin}${window.location.pathname}?public_status=${selectedCommunityId}`;
+                const shareUrlInput = document.getElementById('share-url');
+                shareUrlInput.value = url;
+                const qrCodeContainer = document.getElementById('share-qrcode');
+                qrCodeContainer.innerHTML = '';
+                new QRCode(qrCodeContainer, { text: url, width: 200, height: 200 });
+                shareModal.classList.remove('hidden');
+            });
+            document.getElementById('close-share-modal-btn').addEventListener('click', () => shareModal.classList.add('hidden'));
+            document.getElementById('copy-share-url-btn').addEventListener('click', () => {
+                const shareUrlInput = document.getElementById('share-url');
+                shareUrlInput.select();
+                document.execCommand('copy');
+                showInfoModal('成功', '連結已成功複製到剪貼簿！');
+            });
+
 
             let confirmResolve = null;
             const confirmModal = document.getElementById('confirm-modal');
