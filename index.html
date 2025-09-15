@@ -630,6 +630,13 @@
                     batch.delete(membershipRef);
 
                     await batch.commit();
+                    
+                    // Manually remove the card from the UI for immediate feedback
+                    const cardToRemove = document.querySelector(`.community-card[data-id="${communityId}"]`);
+                    if (cardToRemove) {
+                        cardToRemove.remove();
+                    }
+
                     document.getElementById('info-modal-ok-btn').click(); // Close the "deleting" modal
                 } catch (error) {
                     console.error("Error deleting community:", error);
@@ -937,7 +944,7 @@
                     if (html5QrCode && html5QrCode.getState && html5QrCode.getState() === 2) { // 2 means PAUSED
                         html5QrCode.resume();
                     }
-                }, 2000);
+                }, 500); // Reduced delay for faster subsequent scans
             }
 
             // Feedback and Log UI
