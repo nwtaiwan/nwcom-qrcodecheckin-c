@@ -415,6 +415,7 @@
             let residentsUnsubscribe = null;
             let sessionUnsubscribe = null; // Listener for session management
             let html5QrCode = null;
+            let isProcessingScan = false;
 
             // --- App Flow & Navigation ---
             function showView(viewId) {
@@ -920,31 +921,36 @@
             document.getElementById('stop-scanner-btn').addEventListener('click', stopScanner);
 
             async function onScanSuccess(decodedText, decodedResult) {
-                if (html5QrCode && html5QrCode.isScanning) html5QrCode.pause();
-                
-                const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', decodedText);
-                const residentSnap = await getDoc(residentRef);
+                if (isProcessingScan) return; // Ignore if a scan is already being processed
 
-                if (residentSnap.exists()) {
-                    const residentData = residentSnap.data();
-                    if (residentData.isCheckedIn) {
-                        showFeedback('重複報到', `${residentData.householdId} ${residentData.name} 已報到過。`, 'orange');
-                        addScanLog(`${residentData.householdId} ${residentData.name}`, '重複報到', 'orange');
+                isProcessingScan = true;
+
+                try {
+                    const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', decodedText);
+                    const residentSnap = await getDoc(residentRef);
+
+                    if (residentSnap.exists()) {
+                        const residentData = residentSnap.data();
+                        if (residentData.isCheckedIn) {
+                            showFeedback('重複報到', `${residentData.householdId} ${residentData.name} 已報到過。`, 'orange');
+                            addScanLog(`${residentData.householdId} ${residentData.name}`, '重複報到', 'orange');
+                        } else {
+                            await updateDoc(residentRef, { isCheckedIn: true, checkInTime: serverTimestamp() });
+                            showFeedback('報到成功', `${residentData.householdId} ${residentData.name}`, 'green');
+                            addScanLog(`${residentData.householdId} ${residentData.name}`, '報到成功', 'green');
+                        }
                     } else {
-                        await updateDoc(residentRef, { isCheckedIn: true, checkInTime: serverTimestamp() });
-                        showFeedback('報到成功', `${residentData.householdId} ${residentData.name}`, 'green');
-                        addScanLog(`${residentData.householdId} ${residentData.name}`, '報到成功', 'green');
+                        showFeedback('無效的 QR Code', '找不到對應的住戶資料。', 'red');
+                        addScanLog(`無效的 Code: ${decodedText.substring(0, 8)}...`, '查無資料', 'red');
                     }
-                } else {
-                    showFeedback('無效的 QR Code', '找不到對應的住戶資料。', 'red');
-                    addScanLog(`無效的 Code: ${decodedText.substring(0, 8)}...`, '查無資料', 'red');
+                } catch (error) {
+                    console.error("Error processing scan:", error);
+                } finally {
+                     // Add a short cooldown before allowing the next scan
+                    setTimeout(() => {
+                        isProcessingScan = false;
+                    }, 1500);
                 }
-
-                setTimeout(() => {
-                    if (html5QrCode && html5QrCode.getState && html5QrCode.getState() === 2) { // 2 means PAUSED
-                        html5QrCode.resume();
-                    }
-                }, 500); // Reduced delay for faster subsequent scans
             }
 
             // Feedback and Log UI
