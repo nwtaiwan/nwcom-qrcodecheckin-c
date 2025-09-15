@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社區 QR Code 報到系統</title>
+    <title>西北社區QR Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -67,23 +67,33 @@
         <!-- ===== Login View ===== -->
         <div id="login-view" class="p-8">
             <div class="text-center mb-8">
-                <i class="fas fa-qrcode text-5xl text-blue-600"></i>
-                <h1 class="text-3xl font-bold text-gray-800 mt-4">社區報到系統後台</h1>
-                <p class="text-gray-500">請登入以管理您的社區</p>
+                <i class="fas fa-qrcode text-5xl text-red-600"></i>
+                <h1 class="text-3xl font-bold text-gray-800 mt-4">西北社區QR Code報到系統</h1>
             </div>
             
             <div class="max-w-sm mx-auto">
                 <div class="mb-4">
-                    <label for="account" class="block text-sm font-medium text-gray-700">登入帳號</label>
-                    <input type="text" id="account" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="請輸入英數字帳號">
+                    <div class="flex justify-between items-center">
+                        <label for="account" class="block text-sm font-medium text-gray-700">登入帳號</label>
+                        <div class="flex items-center">
+                            <input id="remember-me" type="checkbox" class="h-4 w-4 text-red-600 focus:ring-red-500 border-gray-300 rounded">
+                            <label for="remember-me" class="ml-2 block text-sm text-gray-700">記住我</label>
+                        </div>
+                    </div>
+                    <input type="text" id="account" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="請輸入英數字帳號">
                 </div>
                 <div class="mb-6">
                     <label for="password" class="block text-sm font-medium text-gray-700">密碼</label>
-                    <input type="password" id="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="********">
+                    <div class="relative mt-1">
+                        <input type="password" id="password" class="block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500 pr-10" placeholder="********">
+                        <button type="button" id="toggle-password-visibility" class="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-500 hover:text-gray-700 focus:outline-none">
+                            <i class="fas fa-eye" id="password-toggle-icon"></i>
+                        </button>
+                    </div>
                 </div>
                 <div id="auth-error" class="text-red-500 text-sm mb-4 text-center hidden"></div>
                 <div class="flex flex-col sm:flex-row gap-2">
-                    <button id="login-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">登入</button>
+                    <button id="login-btn" class="w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">登入</button>
                 </div>
             </div>
         </div>
@@ -367,6 +377,25 @@
             const secondaryApp = initializeApp(firebaseConfig, "secondary-app-for-user-creation");
             const secondaryAuth = getAuth(secondaryApp);
 
+            // --- Login UI Enhancements ---
+            const passwordInput = document.getElementById('password');
+            const togglePasswordBtn = document.getElementById('toggle-password-visibility');
+            const passwordToggleIcon = document.getElementById('password-toggle-icon');
+
+            togglePasswordBtn.addEventListener('click', () => {
+                const isPassword = passwordInput.type === 'password';
+                passwordInput.type = isPassword ? 'text' : 'password';
+                passwordToggleIcon.classList.toggle('fa-eye', !isPassword);
+                passwordToggleIcon.classList.toggle('fa-eye-slash', isPassword);
+            });
+
+            // Load saved account from localStorage
+            const savedAccount = localStorage.getItem('qr-checkin-account');
+            if (savedAccount) {
+                document.getElementById('account').value = savedAccount;
+                document.getElementById('remember-me').checked = true;
+            }
+
             // --- DOM Elements ---
             const mainView = document.getElementById('main-view');
             const communitySelectionView = document.getElementById('community-selection-view');
@@ -464,10 +493,19 @@
                 authError.classList.add('hidden');
                 const account = document.getElementById('account').value.trim();
                 const password = document.getElementById('password').value;
+                const rememberMe = document.getElementById('remember-me').checked;
+
                 if (!account || !password) {
                     handleAuthError({ code: 'auth/invalid-input' }, authError);
                     return;
                 }
+
+                if (rememberMe) {
+                    localStorage.setItem('qr-checkin-account', account);
+                } else {
+                    localStorage.removeItem('qr-checkin-account');
+                }
+
                 const email = `${account}@checkin.system`; // Append dummy domain
                 signInWithEmailAndPassword(auth, email, password).catch(err => handleAuthError(err, authError));
             });
