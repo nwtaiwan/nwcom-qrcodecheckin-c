@@ -3,104 +3,303 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>社區住戶報到系統 - 管理後台</title>
+    <title>社區 QR Code 報到系統</title>
+    <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Font Awesome for icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- QR Code generation library -->
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+    <!-- QR Code scanning library -->
+    <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+
     <style>
-        body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
-        .qrcode-item img { margin: 0 auto; }
+        /* Custom styles */
+        body {
+            font-family: 'Inter', '微軟正黑體', sans-serif;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .tab-button {
+            @apply px-4 py-2 text-sm font-medium text-gray-500 border-b-2 border-transparent hover:text-blue-600 hover:border-blue-600 focus:outline-none;
+        }
+        .tab-button.active {
+            @apply text-blue-600 border-blue-600;
+        }
+        #reader {
+            width: 100%;
+            border: 2px solid #e5e7eb;
+            border-radius: 0.5rem;
+            overflow: hidden;
+        }
+        /* Custom animation for feedback messages */
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translateY(-20px); }
+            10%, 90% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+        .feedback-animation {
+            animation: fadeInOut 3s ease-in-out forwards;
+        }
+        /* Print-friendly styles for QR codes */
         @media print {
-            body * { visibility: hidden; }
-            #qrcode-print-area, #qrcode-print-area * { visibility: visible; }
-            #qrcode-print-area { position: absolute; left: 0; top: 0; width: 100%; }
-            .no-print { display: none; }
+            body * {
+                visibility: hidden;
+            }
+            #qr-code-print-area, #qr-code-print-area * {
+                visibility: visible;
+            }
+            #qr-code-print-area {
+                position: absolute;
+                left: 0;
+                top: 0;
+                width: 100%;
+            }
+            .qr-code-item {
+                page-break-inside: avoid;
+            }
         }
     </style>
 </head>
-<body class="bg-gray-100">
+<body class="bg-gray-100 flex items-center justify-center min-h-screen">
 
-    <div class="w-full max-w-7xl mx-auto p-4 md:p-8">
-        <!-- 頁首 -->
-        <div class="bg-white rounded-2xl shadow-lg p-6 md:p-8 mb-8 no-print">
-            <h1 class="text-3xl md:text-4xl font-bold text-center text-indigo-600">社區住戶報到系統 - 管理後台</h1>
-            <p class="text-center text-gray-500 mt-2">即時監控住戶報到狀態與統計數據</p>
+    <div id="app" class="w-full max-w-4xl mx-auto bg-white shadow-lg rounded-lg overflow-hidden">
+
+        <!-- ===== Login View ===== -->
+        <div id="login-view" class="p-8">
+            <div class="text-center mb-8">
+                <i class="fas fa-qrcode text-5xl text-blue-600"></i>
+                <h1 class="text-3xl font-bold text-gray-800 mt-4">社區報到系統後台</h1>
+                <p class="text-gray-500">請登入以管理報到活動</p>
+            </div>
+            
+            <div class="max-w-sm mx-auto">
+                <div class="mb-4">
+                    <label for="email" class="block text-sm font-medium text-gray-700">電子郵件</label>
+                    <input type="email" id="email" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="your.email@example.com">
+                </div>
+                <div class="mb-6">
+                    <label for="password" class="block text-sm font-medium text-gray-700">密碼</label>
+                    <input type="password" id="password" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" placeholder="********">
+                </div>
+                <div id="auth-error" class="text-red-500 text-sm mb-4 text-center hidden"></div>
+                <div class="flex flex-col sm:flex-row gap-2">
+                    <button id="login-btn" class="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">登入</button>
+                    <button id="register-btn" class="w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 transition duration-150 ease-in-out">註冊新帳號</button>
+                </div>
+            </div>
         </div>
 
-        <!-- 主內容區 -->
-        <div class="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <!-- 左側: 統計儀表板 -->
-            <div class="lg:col-span-1 space-y-6 no-print">
-                <div class="bg-white rounded-2xl shadow-lg p-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">即時報到統計</h2>
-                    <!-- 戶數統計 -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-500">報到戶數</label>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-                            <div id="progress-residents" class="bg-indigo-600 h-2.5 rounded-full" style="width: 0%"></div>
+        <!-- ===== Main App View ===== -->
+        <div id="main-view" class="hidden">
+            <!-- Header -->
+            <header class="bg-gray-50 p-4 border-b flex justify-between items-center">
+                <div>
+                    <h2 id="header-community-name" class="text-xl font-bold text-gray-800">社區名稱</h2>
+                    <p id="header-event-name" class="text-sm text-gray-500">會議活動</p>
+                </div>
+                <button id="logout-btn" class="text-gray-500 hover:text-red-600 focus:outline-none">
+                    <i class="fas fa-sign-out-alt mr-1"></i>登出
+                </button>
+            </header>
+
+            <!-- Tabs -->
+            <nav class="border-b">
+                <div class="flex -mb-px px-4" id="tabs">
+                    <button data-tab="setup" class="tab-button active"><i class="fas fa-cog mr-2"></i>活動設定</button>
+                    <button data-tab="residents" class="tab-button"><i class="fas fa-users mr-2"></i>住戶管理</button>
+                    <button data-tab="scanner" class="tab-button"><i class="fas fa-qrcode mr-2"></i>掃碼報到</button>
+                    <button data-tab="status" class="tab-button"><i class="fas fa-chart-pie mr-2"></i>報到狀況</button>
+                </div>
+            </nav>
+
+            <!-- Tab Content -->
+            <main id="tab-content" class="p-6" style="min-height: 60vh;">
+                <!-- Setup Tab -->
+                <div id="setup-tab" class="tab-pane">
+                    <h3 class="text-2xl font-semibold mb-4 text-gray-700">活動設定</h3>
+                    <div class="space-y-4 max-w-lg">
+                        <div>
+                            <label for="community-name" class="block text-sm font-medium text-gray-700">社區名稱</label>
+                            <input type="text" id="community-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        <p class="text-right text-lg font-semibold mt-1"><span id="checked-in-residents">0</span> / <span id="total-residents">0</span> 戶 (<span id="percentage-residents">0%</span>)</p>
-                    </div>
-                    <!-- 坪數統計 -->
-                    <div class="mb-4">
-                        <label class="block text-sm font-medium text-gray-500">報到坪數</label>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-                            <div id="progress-area" class="bg-teal-500 h-2.5 rounded-full" style="width: 0%"></div>
+                        <div>
+                            <label for="event-name" class="block text-sm font-medium text-gray-700">會議/活動名稱</label>
+                            <input type="text" id="event-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
                         </div>
-                        <p class="text-right text-lg font-semibold mt-1"><span id="checked-in-area">0.00</span> / <span id="total-area">0.00</span> 坪 (<span id="percentage-area">0%</span>)</p>
+                        <div>
+                            <label for="event-date" class="block text-sm font-medium text-gray-700">日期與時間</label>
+                            <input type="datetime-local" id="event-date" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500">
+                        </div>
+                        <button id="save-config-btn" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">儲存設定</button>
+                        <p id="config-feedback" class="text-green-600 text-sm mt-2"></p>
                     </div>
-                    <!-- 區分權比例統計 -->
+                </div>
+
+                <!-- Residents Tab -->
+                <div id="residents-tab" class="tab-pane hidden">
+                    <div class="flex justify-between items-center mb-4">
+                        <h3 class="text-2xl font-semibold text-gray-700">住戶管理</h3>
+                        <button id="view-qrcodes-btn" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"><i class="fas fa-print mr-2"></i>產生 & 列印 QR Code</button>
+                    </div>
+                    <!-- Add Resident Form -->
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6">
+                        <h4 class="font-semibold mb-2">新增住戶</h4>
+                        <form id="add-resident-form" class="flex flex-col sm:flex-row gap-4 items-end">
+                            <div class="flex-grow w-full">
+                                <label for="resident-household" class="block text-sm font-medium text-gray-700">戶號 (例如: A-101)</label>
+                                <input type="text" id="resident-household" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            <div class="flex-grow w-full">
+                                <label for="resident-name" class="block text-sm font-medium text-gray-700">住戶姓名</label>
+                                <input type="text" id="resident-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required>
+                            </div>
+                            <button type="submit" class="w-full sm:w-auto bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">新增</button>
+                        </form>
+                    </div>
+                    <!-- Resident List -->
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">姓名</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="resident-list" class="text-gray-700">
+                                <!-- Resident rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Scanner Tab -->
+                <div id="scanner-tab" class="tab-pane hidden">
+                     <div class="flex flex-col md:flex-row gap-6">
+                        <div class="w-full md:w-1/2">
+                            <h3 class="text-2xl font-semibold mb-2 text-gray-700">掃碼報到</h3>
+                            <p class="text-gray-500 mb-4">將住戶的 QR code 對準下方掃描框</p>
+                            <div id="reader-container" class="relative">
+                                <div id="reader"></div>
+                                <div id="feedback-overlay" class="absolute inset-0 flex items-center justify-center pointer-events-none"></div>
+                            </div>
+                            <div id="scanner-error" class="text-red-500 mt-2"></div>
+                            <button id="stop-scanner-btn" class="hidden mt-4 w-full bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700">停止掃描</button>
+                        </div>
+                        <div class="w-full md:w-1/2">
+                            <h4 class="text-xl font-semibold mb-4 text-gray-700">最近報到紀錄</h4>
+                            <div id="scan-log" class="space-y-2 h-96 overflow-y-auto bg-gray-50 p-3 rounded-lg">
+                                <!-- Scan log entries will be here -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Tab -->
+                <div id="status-tab" class="tab-pane hidden">
+                    <h3 class="text-2xl font-semibold mb-4 text-gray-700">即時報到狀況</h3>
+                    <div class="bg-gray-50 p-4 rounded-lg mb-6 shadow">
+                        <div class="flex justify-around text-center">
+                            <div>
+                                <p class="text-sm text-gray-500">總戶數</p>
+                                <p id="total-residents" class="text-3xl font-bold text-gray-800">0</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">已報到</p>
+                                <p id="checked-in-count" class="text-3xl font-bold text-green-600">0</p>
+                            </div>
+                            <div>
+                                <p class="text-sm text-gray-500">報到率</p>
+                                <p id="check-in-percentage" class="text-3xl font-bold text-blue-600">0%</p>
+                            </div>
+                        </div>
+                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-4">
+                            <div id="progress-bar" class="bg-blue-600 h-2.5 rounded-full" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full bg-white rounded-lg shadow">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">戶號</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">姓名</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">報到狀態</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">報到時間</th>
+                                </tr>
+                            </thead>
+                            <tbody id="status-list" class="text-gray-700">
+                                <!-- Status rows will be inserted here -->
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </main>
+        </div>
+
+        <!-- QR Code Modal -->
+        <div id="qrcode-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-5xl max-h-[90vh] flex flex-col">
+                <div class="p-4 border-b flex justify-between items-center">
+                    <h3 class="text-xl font-semibold">住戶 QR Code</h3>
                     <div>
-                        <label class="block text-sm font-medium text-gray-500">區分權比例</label>
-                        <div class="w-full bg-gray-200 rounded-full h-2.5 mt-1">
-                            <div id="progress-ratio" class="bg-amber-500 h-2.5 rounded-full" style="width: 0%"></div>
-                        </div>
-                        <p class="text-right text-lg font-semibold mt-1"><span id="checked-in-ratio">0</span> / <span id="total-ratio">0</span> (<span id="percentage-ratio">0%</span>)</p>
+                        <button id="print-qrcodes-btn" class="mr-2 bg-blue-600 text-white py-1 px-3 rounded-md hover:bg-blue-700"><i class="fas fa-print mr-1"></i>列印</button>
+                        <button id="close-qrcode-modal-btn" class="text-gray-500 hover:text-gray-800">&times;</button>
                     </div>
                 </div>
-                 <div class="bg-white rounded-2xl shadow-lg p-6">
-                    <h2 class="text-xl font-bold text-gray-800 mb-4">管理工具</h2>
-                    <button onclick="window.print()" class="w-full bg-gray-700 text-white font-bold py-3 px-4 rounded-lg hover:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 transition">
-                        列印 QR Code
-                    </button>
-                </div>
-            </div>
-
-            <!-- 右側: 住戶報到列表 -->
-            <div class="lg:col-span-2 bg-white rounded-2xl shadow-lg p-6 no-print">
-                <h2 class="text-xl font-bold text-gray-800 mb-4">住戶報到狀態列表</h2>
-                <div class="overflow-y-auto h-[60vh] pr-2">
-                    <table class="w-full text-left">
-                        <thead class="bg-gray-50 sticky top-0">
-                            <tr>
-                                <th class="p-3 text-sm font-semibold">狀態</th>
-                                <th class="p-3 text-sm font-semibold">戶號</th>
-                                <th class="p-3 text-sm font-semibold">姓名</th>
-                                <th class="p-3 text-sm font-semibold">報到時間</th>
-                            </tr>
-                        </thead>
-                        <tbody id="resident-list">
-                            <!-- 住戶資料會顯示在這裡 -->
-                        </tbody>
-                    </table>
+                <div id="qr-code-print-area" class="p-6 overflow-y-auto">
+                    <div id="qrcode-list" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+                        <!-- QR codes will be inserted here -->
+                    </div>
                 </div>
             </div>
         </div>
 
-        <!-- 用於生成和列印的 QR Code 區域 -->
-        <div id="qrcode-print-area" class="mt-8">
-             <h1 class="text-2xl font-bold text-center mb-6">社區住戶報到 QR Code</h1>
-             <div id="qrcode-list" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                <!-- QR Codes will be generated here -->
-             </div>
+        <!-- Confirmation Modal -->
+        <div id="confirm-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+            <div class="bg-white rounded-lg shadow-xl w-11/12 max-w-sm p-6">
+                <h3 id="confirm-modal-title" class="text-lg font-semibold text-gray-800 mb-4">確定要執行此操作嗎？</h3>
+                <p id="confirm-modal-text" class="text-gray-600 mb-6">此動作無法復原。</p>
+                <div class="flex justify-end gap-4">
+                    <button id="confirm-modal-cancel-btn" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">取消</button>
+                    <button id="confirm-modal-ok-btn" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700">確定刪除</button>
+                </div>
+            </div>
         </div>
+
     </div>
 
+    <!-- Firebase SDK -->
     <script type="module">
+        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, onSnapshot, doc, getDocs, writeBatch } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { 
+            getAuth, 
+            createUserWithEmailAndPassword, 
+            signInWithEmailAndPassword, 
+            onAuthStateChanged, 
+            signOut 
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { 
+            getFirestore, 
+            doc, 
+            getDoc, 
+            setDoc, 
+            addDoc, 
+            collection, 
+            onSnapshot,
+            query,
+            updateDoc,
+            deleteDoc,
+            serverTimestamp
+        } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- Firebase 設定 ---
+        // --- Firebase Configuration ---
+        // IMPORTANT: 請在此處貼上您自己的 Firebase 設定物件
+        // 1. 前往 https://console.firebase.google.com/ 建立一個新的 Firebase 專案。
+        // 2. 在您的專案中，建立一個「網頁」應用程式。
+        // 3. Firebase 會提供一組設定碼 (firebaseConfig)，請將其複製並貼到下方。
+        // 4. **(重要!)** 在 Firebase 主控台中，前往「Authentication」->「Sign-in method」，**啟用「電子郵件/密碼」登入方式**。
+        // 5. 前往「Firestore Database」，建立一個資料庫，並設定安全規則為測試模式 (允許讀寫) 以便開始。
         const firebaseConfig = {
   apiKey: "AIzaSyA66MZ0dfxSrWgtCiIyNW4GjTo0n1s7psg",
   authDomain: "nwcom-qrcodecheckin.firebaseapp.com",
@@ -110,176 +309,480 @@
   appId: "1:700787049117:web:13ccf14c5c41abff6b4a74",
   measurementId: "G-E857BJVJMD"
 };
+        
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-qr-checkin';
+        
+        // --- App Initialization ---
+        const loginView = document.getElementById('login-view');
 
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
+        // 檢查 firebaseConfig 是否已填寫
+        if (firebaseConfig.apiKey === "YOUR_API_KEY" && typeof __firebase_config === 'undefined') {
+            loginView.innerHTML = `
+                <div class="p-8 text-center bg-red-50 rounded-lg">
+                    <h1 class="text-2xl font-bold text-red-700">設定錯誤</h1>
+                    <p class="mt-2 text-gray-800">
+                        Firebase 設定尚未完成。請編輯此 HTML 檔案，
+                        在 &lt;script type="module"&gt; 區塊中填入您自己的 Firebase 設定碼 (firebaseConfig)。
+                    </p>
+                    <p class="mt-4 text-sm text-gray-600">
+                        詳細步驟請參考程式碼內的註解說明。
+                    </p>
+                </div>
+            `;
+            throw new Error("Firebase config is not set. Please update the firebaseConfig object in the script.");
+        }
+        
+        const finalFirebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : firebaseConfig;
+        const app = initializeApp(finalFirebaseConfig);
         const auth = getAuth(app);
+        const db = getFirestore(app);
 
-        // --- 應用程式設定 ---
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-community-app';
-        const meetingId = 'annual-meeting-2025';
-        const collectionPath = `/artifacts/${appId}/public/data/community-meetings/${meetingId}/residents`;
-        
-        // --- 範例住戶資料 ---
-        const sampleResidents = [
-            { residentId: "A001ADDT", householdNum: "A-101", name: "王大明", address: "幸福路一段1號1樓", area: 50.5, ratioNumerator: 125, ratioDenominator: 10000 },
-            { residentId: "A002ADDT", householdNum: "A-102", name: "陳淑芬", address: "幸福路一段1號2樓", area: 48.2, ratioNumerator: 119, ratioDenominator: 10000 },
-            { residentId: "A003ADDT", householdNum: "B-201", name: "林建宏", address: "快樂街二段2號1樓", area: 65.0, ratioNumerator: 180, ratioDenominator: 10000 },
-            { residentId: "A004ADDT", householdNum: "C-301", name: "張美玲", address: "快樂街二段3號1樓", area: 33.7, ratioNumerator: 95, ratioDenominator: 10000 },
-            { residentId: "A005ADDT", householdNum: "C-302", name: "李文雄", address: "快樂街二段3號2樓", area: 72.1, ratioNumerator: 210, ratioDenominator: 10000 },
-            { residentId: "A006ADDT", householdNum: "D-401", name: "吳秀蘭", address: "美滿巷4弄4號", area: 55.5, ratioNumerator: 140, ratioDenominator: 10000 },
-        ];
-        
-        // --- 初始化資料庫 ---
-        async function setupInitialData() {
-            const residentsRef = collection(db, collectionPath);
-            const snapshot = await getDocs(residentsRef);
-            if (snapshot.empty) {
-                console.log("資料庫為空，正在寫入範例資料...");
-                const batch = writeBatch(db);
-                sampleResidents.forEach(resident => {
-                    const docRef = doc(db, collectionPath, resident.residentId);
-                    batch.set(docRef, { ...resident, isCheckedIn: false, checkinTimestamp: null });
-                });
-                await batch.commit();
-                console.log("範例資料寫入完成。");
-            } else {
-                console.log("資料庫已有資料，無需初始化。");
-            }
-            generateQRCodesForPrint(snapshot.docs.length > 0 ? snapshot.docs.map(d => d.data()) : sampleResidents);
+        // --- DOM Elements ---
+        const mainView = document.getElementById('main-view');
+        const authError = document.getElementById('auth-error');
+        const confirmModal = document.getElementById('confirm-modal');
+        const confirmModalOkBtn = document.getElementById('confirm-modal-ok-btn');
+        const confirmModalCancelBtn = document.getElementById('confirm-modal-cancel-btn');
+
+        // --- State ---
+        let currentUser = null;
+        let configUnsubscribe = null;
+        let residentsUnsubscribe = null;
+        let html5QrCode = null;
+        let confirmResolve = null;
+
+        // --- Confirmation Modal Logic ---
+        function showConfirmModal(title, text, confirmText = '確定') {
+            return new Promise((resolve) => {
+                document.getElementById('confirm-modal-title').textContent = title;
+                document.getElementById('confirm-modal-text').textContent = text;
+                confirmModalOkBtn.textContent = confirmText;
+                confirmModal.classList.remove('hidden');
+                confirmResolve = resolve;
+            });
         }
 
-        // --- 生成 QR Code 供列印 ---
-        function generateQRCodesForPrint(residents) {
-            const list = document.getElementById('qrcode-list');
-            list.innerHTML = '';
-            const baseUrl = window.location.origin + window.location.pathname.replace('admin.html', 'index.html');
+        confirmModalOkBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            if (confirmResolve) confirmResolve(true);
+        });
+
+        confirmModalCancelBtn.addEventListener('click', () => {
+            confirmModal.classList.add('hidden');
+            if (confirmResolve) confirmResolve(false);
+        });
+
+        // --- Authentication ---
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                currentUser = user;
+                loginView.classList.add('hidden');
+                mainView.classList.remove('hidden');
+                setupListeners();
+            } else {
+                currentUser = null;
+                loginView.classList.remove('hidden');
+                mainView.classList.add('hidden');
+                cleanupListeners();
+            }
+        });
+
+        document.getElementById('login-btn').addEventListener('click', () => {
+            authError.classList.add('hidden');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
             
-            residents.forEach(res => {
-                const checkinUrl = `${baseUrl}?meeting=${meetingId}&resident=${res.residentId}`;
+            if (!email || !password) {
+                authError.textContent = '電子郵件和密碼欄位不可空白。';
+                authError.classList.remove('hidden');
+                return;
+            }
+
+            signInWithEmailAndPassword(auth, email, password)
+                .catch(error => handleAuthError(error));
+        });
+
+        document.getElementById('register-btn').addEventListener('click', () => {
+            authError.classList.add('hidden');
+            const email = document.getElementById('email').value;
+            const password = document.getElementById('password').value;
+
+            if (!email || !password) {
+                authError.textContent = '電子郵件和密碼欄位不可空白。';
+                authError.classList.remove('hidden');
+                return;
+            }
+             if (password.length < 6) {
+                authError.textContent = '密碼長度至少需要6個字元。';
+                authError.classList.remove('hidden');
+                return;
+            }
+
+            createUserWithEmailAndPassword(auth, email, password)
+                .catch(error => handleAuthError(error));
+        });
+        
+        document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
+
+        function handleAuthError(error) {
+            console.error("Authentication Error:", error);
+            authError.classList.remove('hidden');
+            switch (error.code) {
+                case 'auth/invalid-email':
+                    authError.textContent = '信箱格式錯誤。';
+                    break;
+                case 'auth/user-not-found':
+                case 'auth/wrong-password':
+                    authError.textContent = '信箱或密碼錯誤。';
+                    break;
+                case 'auth/email-already-in-use':
+                    authError.textContent = '此信箱已被註冊。';
+                    break;
+                case 'auth/weak-password':
+                    authError.textContent = '密碼強度不足，至少需要6個字元。';
+                    break;
+                case 'auth/operation-not-allowed':
+                    authError.textContent = '註冊方式未啟用。請前往 Firebase 後台啟用「電子郵件/密碼」登入。';
+                    break;
+                default:
+                    authError.textContent = '發生未知錯誤，請稍後再試。';
+            }
+        }
+        
+        // --- Firestore References ---
+        const configRef = doc(db, `artifacts/${appId}/public/data/config/eventConfig`);
+        const residentsColRef = collection(db, `artifacts/${appId}/public/data/residents`);
+
+        // --- Data Listeners ---
+        function setupListeners() {
+            // Config Listener
+            configUnsubscribe = onSnapshot(configRef, (docSnap) => {
+                const configData = docSnap.exists() ? docSnap.data.js() : {};
+                updateConfigUI(configData);
+            });
+
+            // Residents Listener
+            const q = query(residentsColRef);
+            residentsUnsubscribe = onSnapshot(q, (snapshot) => {
+                const residents = [];
+                snapshot.forEach(doc => residents.push({ id: doc.id, ...doc.data() }));
+                updateResidentsUI(residents);
+                updateStatusUI(residents);
+            });
+        }
+        
+        function cleanupListeners() {
+            if (configUnsubscribe) configUnsubscribe();
+            if (residentsUnsubscribe) residentsUnsubscribe();
+        }
+
+        // --- UI Updates ---
+        function updateConfigUI(data) {
+            document.getElementById('community-name').value = data.communityName || '';
+            document.getElementById('event-name').value = data.eventName || '';
+            document.getElementById('event-date').value = data.eventDate || '';
+            document.getElementById('header-community-name').textContent = data.communityName || '尚未設定社區';
+            document.getElementById('header-event-name').textContent = data.eventName || '尚未設定活動';
+        }
+
+        function updateResidentsUI(residents) {
+            const list = document.getElementById('resident-list');
+            list.innerHTML = ''; // Clear list
+            residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td class="py-3 px-4">${res.householdId}</td>
+                    <td class="py-3 px-4">${res.name}</td>
+                    <td class="py-3 px-4">
+                        <button data-id="${res.id}" class="delete-resident-btn text-red-500 hover:text-red-700">
+                            <i class="fas fa-trash-alt"></i>
+                        </button>
+                    </td>
+                `;
+                list.appendChild(row);
+            });
+            // Update QR code modal as well
+            updateQrCodeModal(residents);
+        }
+
+        function updateStatusUI(residents) {
+            const total = residents.length;
+            const checkedIn = residents.filter(r => r.isCheckedIn).length;
+            const percentage = total > 0 ? Math.round((checkedIn / total) * 100) : 0;
+
+            document.getElementById('total-residents').textContent = total;
+            document.getElementById('checked-in-count').textContent = checkedIn;
+            document.getElementById('check-in-percentage').textContent = `${percentage}%`;
+            document.getElementById('progress-bar').style.width = `${percentage}%`;
+            
+            const list = document.getElementById('status-list');
+            list.innerHTML = '';
+            residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                const checkInTime = res.checkInTime ? new Date(res.checkInTime.seconds * 1000).toLocaleTimeString('zh-TW') : '---';
+                const row = document.createElement('tr');
+                row.className = res.isCheckedIn ? 'bg-green-50' : '';
+                row.innerHTML = `
+                    <td class="py-3 px-4">${res.householdId}</td>
+                    <td class="py-3 px-4">${res.name}</td>
+                    <td class="py-3 px-4">
+                        <span class="px-2 py-1 text-xs rounded-full ${res.isCheckedIn ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}">
+                            ${res.isCheckedIn ? '已報到' : '未報到'}
+                        </span>
+                    </td>
+                    <td class="py-3 px-4">${checkInTime}</td>
+                `;
+                list.appendChild(row);
+            });
+        }
+        
+        function updateQrCodeModal(residents) {
+            const qrList = document.getElementById('qrcode-list');
+            qrList.innerHTML = '';
+            residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
                 const item = document.createElement('div');
-                item.className = "qrcode-item border p-2 rounded-lg text-center bg-white";
+                item.className = 'qr-code-item border p-4 rounded-lg text-center flex flex-col items-center justify-center';
+                const qrContainer = document.createElement('div');
+                qrContainer.id = `qr-${res.id}`;
+                qrContainer.className = 'mb-2';
+                item.appendChild(qrContainer);
                 
                 const info = document.createElement('p');
-                info.className = "font-semibold text-sm";
-                info.textContent = `${res.householdNum} ${res.name}`;
-                
-                const qrDiv = document.createElement('div');
-                qrDiv.className = "mt-1";
-
+                info.className = 'font-semibold';
+                info.textContent = `${res.householdId} ${res.name}`;
                 item.appendChild(info);
-                item.appendChild(qrDiv);
-                list.appendChild(item);
+                
+                qrList.appendChild(item);
 
-                new QRCode(qrDiv, {
-                    text: checkinUrl,
+                // Generate QR Code
+                new QRCode(qrContainer, {
+                    text: res.id,
                     width: 128,
                     height: 128,
-                    correctLevel: QRCode.CorrectLevel.H
                 });
             });
         }
-        
-        // --- 即時監聽報到資料並更新儀表板 ---
-        function setupRealtimeListener() {
-            onSnapshot(collection(db, collectionPath), (snapshot) => {
-                let totalRes = 0, checkedInRes = 0;
-                let totalAr = 0, checkedInAr = 0;
-                let totalRa = 0, checkedInRa = 0, denominator = 1;
 
-                const allResidents = [];
-                snapshot.forEach(doc => {
-                    const data = doc.data();
-                    allResidents.push(data);
+        // --- Event Handlers ---
+        document.getElementById('save-config-btn').addEventListener('click', async () => {
+            const configData = {
+                communityName: document.getElementById('community-name').value,
+                eventName: document.getElementById('event-name').value,
+                eventDate: document.getElementById('event-date').value,
+            };
+            try {
+                await setDoc(configRef, configData);
+                const feedback = document.getElementById('config-feedback');
+                feedback.textContent = '設定已成功儲存！';
+                setTimeout(() => feedback.textContent = '', 3000);
+            } catch (e) {
+                console.error("Error saving config:", e);
+                // Cannot use alert
+            }
+        });
 
-                    totalRes++;
-                    totalAr += data.area;
-                    totalRa += data.ratioNumerator;
-                    denominator = data.ratioDenominator; // 假設所有分母都相同
+        document.getElementById('add-resident-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const householdInput = document.getElementById('resident-household');
+            const nameInput = document.getElementById('resident-name');
+            const newResident = {
+                householdId: householdInput.value.trim(),
+                name: nameInput.value.trim(),
+                isCheckedIn: false,
+                checkInTime: null,
+            };
+            if (newResident.householdId && newResident.name) {
+                try {
+                    await addDoc(residentsColRef, newResident);
+                    householdInput.value = '';
+                    nameInput.value = '';
+                    householdInput.focus();
+                } catch(e) {
+                    console.error("Error adding resident: ", e);
+                }
+            }
+        });
 
-                    if (data.isCheckedIn) {
-                        checkedInRes++;
-                        checkedInAr += data.area;
-                        checkedInRa += data.ratioNumerator;
+        document.getElementById('resident-list').addEventListener('click', async (e) => {
+            if (e.target.closest('.delete-resident-btn')) {
+                const btn = e.target.closest('.delete-resident-btn');
+                const residentId = btn.dataset.id;
+                const confirmed = await showConfirmModal('刪除住戶', '您確定要刪除這位住戶嗎？', '確定刪除');
+                if (confirmed) {
+                    try {
+                        await deleteDoc(doc(db, `artifacts/${appId}/public/data/residents`, residentId));
+                    } catch (e) {
+                        console.error("Error deleting resident: ", e);
+                    }
+                }
+            }
+        });
+
+        // --- Tabs Navigation ---
+        const tabs = document.getElementById('tabs');
+        const tabPanes = document.querySelectorAll('.tab-pane');
+        tabs.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                const tabId = e.target.dataset.tab;
+                
+                tabs.querySelectorAll('button').forEach(btn => btn.classList.remove('active'));
+                e.target.classList.add('active');
+
+                tabPanes.forEach(pane => {
+                    if (pane.id === `${tabId}-tab`) {
+                        pane.classList.remove('hidden');
+                    } else {
+                        pane.classList.add('hidden');
                     }
                 });
-                
-                // 更新統計數據
-                document.getElementById('total-residents').textContent = totalRes;
-                document.getElementById('checked-in-residents').textContent = checkedInRes;
-                const percRes = totalRes > 0 ? (checkedInRes / totalRes * 100).toFixed(1) : 0;
-                document.getElementById('percentage-residents').textContent = `${percRes}%`;
-                document.getElementById('progress-residents').style.width = `${percRes}%`;
 
-                document.getElementById('total-area').textContent = totalAr.toFixed(2);
-                document.getElementById('checked-in-area').textContent = checkedInAr.toFixed(2);
-                const percArea = totalAr > 0 ? (checkedInAr / totalAr * 100).toFixed(1) : 0;
-                document.getElementById('percentage-area').textContent = `${percArea}%`;
-                document.getElementById('progress-area').style.width = `${percArea}%`;
-                
-                document.getElementById('total-ratio').textContent = totalRa;
-                document.getElementById('checked-in-ratio').textContent = checkedInRa;
-                const percRatio = totalRa > 0 ? (checkedInRa / totalRa * 100).toFixed(1) : 0;
-                document.getElementById('percentage-ratio').textContent = `${percRatio}%`;
-                document.getElementById('progress-ratio').style.width = `${percRatio}%`;
-
-                // 更新住戶列表
-                const list = document.getElementById('resident-list');
-                list.innerHTML = '';
-                allResidents.sort((a,b) => a.householdNum.localeCompare(b.householdNum)).forEach(data => {
-                    const row = document.createElement('tr');
-                    row.className = data.isCheckedIn ? 'bg-green-100' : 'bg-white';
-                    
-                    const time = data.checkinTimestamp ? new Date(data.checkinTimestamp.seconds * 1000).toLocaleTimeString('zh-TW') : '---';
-                    
-                    row.innerHTML = `
-                        <td class="p-3"><span class="px-2 py-1 text-xs font-semibold rounded-full ${data.isCheckedIn ? 'bg-green-200 text-green-800' : 'bg-gray-200 text-gray-800'}">${data.isCheckedIn ? '已報到' : '未報到'}</span></td>
-                        <td class="p-3 font-medium">${data.householdNum}</td>
-                        <td class="p-3">${data.name}</td>
-                        <td class="p-3 text-gray-500">${time}</td>
-                    `;
-                    list.appendChild(row);
-                });
-                
-                // 初次載入時生成QR Code
-                 if (document.getElementById('qrcode-list').innerHTML === '') {
-                    generateQRCodesForPrint(allResidents);
+                // Handle scanner logic on tab change
+                if (tabId === 'scanner') {
+                    startScanner();
+                } else {
+                    stopScanner();
                 }
-            }, (error) => {
-                console.error("Firestore snapshot error:", error);
-                 const list = document.getElementById('resident-list');
-                 list.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-red-500">無法讀取住戶列表。(${error.message})</td></tr>`;
-            });
+            }
+        });
+
+        // --- QR Code Scanner Logic ---
+        function startScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                return;
+            }
+            html5QrCode = new Html5Qrcode("reader");
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            document.getElementById('scanner-error').textContent = '正在啟動攝影機...';
+            document.getElementById('stop-scanner-btn').classList.remove('hidden');
+
+            html5QrCode.start({ facingMode: "environment" }, config, onScanSuccess, onScanFailure)
+                .then(() => {
+                    document.getElementById('scanner-error').textContent = '';
+                })
+                .catch(err => {
+                    document.getElementById('scanner-error').textContent = `無法啟動攝影機: ${err}`;
+                    console.error("Camera start error:", err);
+                });
+        }
+        
+        function stopScanner() {
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().then(() => {
+                    console.log("Scanner stopped.");
+                    document.getElementById('stop-scanner-btn').classList.add('hidden');
+                }).catch(err => console.error("Scanner stop failed", err));
+            }
+        }
+        
+        document.getElementById('stop-scanner-btn').addEventListener('click', stopScanner);
+
+        async function onScanSuccess(decodedText, decodedResult) {
+            // Pause scanner to prevent multiple scans of the same code
+            if (html5QrCode.isScanning) html5QrCode.pause();
+
+            try {
+                const residentRef = doc(db, `artifacts/${appId}/public/data/residents`, decodedText);
+                const residentSnap = await getDoc(residentRef);
+
+                if (residentSnap.exists()) {
+                    const residentData = residentSnap.data();
+                    if (residentData.isCheckedIn) {
+                        showFeedback('重複報到', `${residentData.householdId} ${residentData.name} 已報到過。`, 'orange');
+                        addScanLog(`${residentData.householdId} ${residentData.name}`, '重複報到', 'orange');
+                    } else {
+                        await updateDoc(residentRef, {
+                            isCheckedIn: true,
+                            checkInTime: serverTimestamp()
+                        });
+                        showFeedback('報到成功', `${residentData.householdId} ${residentData.name}`, 'green');
+                        addScanLog(`${residentData.householdId} ${residentData.name}`, '報到成功', 'green');
+                    }
+                } else {
+                    showFeedback('無效的 QR Code', '找不到對應的住戶資料。', 'red');
+                    addScanLog(`無效的 Code: ${decodedText.substring(0, 8)}...`, '查無資料', 'red');
+                }
+            } catch (e) {
+                console.error("Error processing scan:", e);
+                showFeedback('處理錯誤', '發生網路或資料庫錯誤。', 'red');
+            }
+
+            // Resume scanner after a short delay
+            setTimeout(() => {
+                // Check if scanner exists and its state is paused
+                if (html5QrCode && typeof html5QrCode.getState === 'function' && html5QrCode.getState() === 2) { // 2 corresponds to PAUSED state
+                    html5QrCode.resume();
+                }
+            }, 2000);
         }
 
-        // --- 啟動應用 ---
-        async function initializeAppAndAuth() {
-            try {
-                // Sign in to get permissions
-                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                    await signInWithCustomToken(auth, __initial_auth_token);
-                    console.log("Signed in with custom token.");
-                } else {
-                    await signInAnonymously(auth);
-                    console.log("Signed in anonymously.");
-                }
 
-                // Now that we are authenticated, setup listener and initial data
-                setupRealtimeListener();
-                await setupInitialData();
-                
-            } catch (error) {
-                console.error("Authentication or initialization failed:", error);
-                const mainContainer = document.querySelector('.w-full.max-w-7xl');
-                mainContainer.innerHTML = `<div class="text-center text-red-600 bg-red-100 border border-red-400 rounded-lg p-8">
-                    <h2 class="text-xl font-bold">系統連線失敗</h2>
-                    <p class="mt-2">無法連接到後台服務，請檢查您的網路連線或聯繫管理員。</p>
-                    <p class="mt-1 text-sm text-gray-600">錯誤訊息: ${error.message}</p>
-                </div>`;
+        function onScanFailure(error) {
+            // This is called frequently, so we don't log every failure.
+            // console.warn(`Code scan error = ${error}`);
+        }
+        
+        function showFeedback(title, message, color) {
+            const overlay = document.getElementById('feedback-overlay');
+            const colorClasses = {
+                green: 'bg-green-500',
+                orange: 'bg-orange-500',
+                red: 'bg-red-500'
+            };
+            const iconClasses = {
+                green: 'fa-check-circle',
+                orange: 'fa-exclamation-triangle',
+                red: 'fa-times-circle'
+            }
+
+            const feedbackDiv = document.createElement('div');
+            feedbackDiv.className = `feedback-animation text-white p-6 rounded-lg shadow-2xl text-center ${colorClasses[color]}`;
+            feedbackDiv.innerHTML = `
+                <i class="fas ${iconClasses[color]} text-5xl mb-3"></i>
+                <h3 class="text-2xl font-bold">${title}</h3>
+                <p class="text-lg">${message}</p>
+            `;
+            
+            overlay.innerHTML = ''; // Clear previous
+            overlay.appendChild(feedbackDiv);
+            
+            setTimeout(() => {
+                if(overlay.contains(feedbackDiv)){
+                   overlay.removeChild(feedbackDiv);
+                }
+            }, 2800);
+        }
+        
+        function addScanLog(text, status, color) {
+            const logContainer = document.getElementById('scan-log');
+            const time = new Date().toLocaleTimeString('zh-TW', { hour12: false });
+            const colorClasses = {
+                green: 'border-green-500',
+                orange: 'border-orange-500',
+                red: 'border-red-500'
+            };
+            
+            const logEntry = document.createElement('div');
+            logEntry.className = `p-2 border-l-4 ${colorClasses[color]} bg-white rounded-r-lg shadow-sm`;
+            logEntry.innerHTML = `
+                <div class="flex justify-between items-center">
+                    <span class="font-medium text-gray-800">${text}</span>
+                    <span class="text-xs text-gray-500">${time}</span>
+                </div>
+                <p class="text-sm text-gray-600">${status}</p>
+            `;
+            logContainer.prepend(logEntry);
+            // Keep log from growing too large
+            if (logContainer.children.length > 50) {
+                logContainer.removeChild(logContainer.lastChild);
             }
         }
 
-        initializeAppAndAuth();
+        // --- QR Code Modal ---
+        const qrModal = document.getElementById('qrcode-modal');
+        document.getElementById('view-qrcodes-btn').addEventListener('click', () => qrModal.classList.remove('hidden'));
+        document.getElementById('close-qrcode-modal-btn').addEventListener('click', () => qrModal.classList.add('hidden'));
+        document.getElementById('print-qrcodes-btn').addEventListener('click', () => window.print());
+
     </script>
 </body>
 </html>
