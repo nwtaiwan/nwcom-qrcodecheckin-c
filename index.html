@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區 Code報到系統</title>
+    <title>西北社區QR Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -540,19 +540,17 @@
 
 
         function initializeAppLogic() {
-            const loginView = document.getElementById('login-view');
-            if (firebaseConfig.apiKey === "YOUR_API_KEY" || !firebaseConfig.apiKey) {
-                loginView.innerHTML = `
-                    <div class="p-8 text-center bg-red-50 rounded-lg">
-                        <i class="fas fa-exclamation-triangle text-4xl text-red-500 mb-4"></i>
-                        <h1 class="text-2xl font-bold text-red-700">下一步：請設定 Firebase</h1>
-                        <p class="mt-2 text-gray-800">
-                            您的報到系統尚未與後端資料庫連接。請依照先前提供的教學文件，完成 Firebase 設定，然後將專案的 
-                            <code>firebaseConfig</code> 
-                            設定碼貼入此 HTML 檔案中取代預留位置。
-                        </p>
-                    </div>`;
-                return;
+            // This function contains the main application logic for logged-in users.
+            
+            // --- Audio Feedback Setup ---
+            function speak(text) {
+                if ('speechSynthesis' in window) {
+                    window.speechSynthesis.cancel(); // Stop any previous speech
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = 'zh-TW'; // Set language to Taiwanese Mandarin
+                    utterance.rate = 1.2;
+                    window.speechSynthesis.speak(utterance);
+                }
             }
 
             // --- Login UI Enhancements ---
@@ -1146,22 +1144,10 @@
 
                 showInfoModal('匯入中...', '正在處理CSV檔案，請稍候...');
                 
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    const text = e.target.result;
-                    processCsvText(text);
-                };
-                reader.onerror = () => {
-                    showInfoModal('匯入失敗', '讀取檔案時發生錯誤。');
-                    csvImportInput.value = '';
-                };
-                reader.readAsText(file, 'UTF-8');
-            });
-
-            async function processCsvText(csvText) {
-                Papa.parse(csvText.trim(), {
+                Papa.parse(file, {
                     header: true,
                     skipEmptyLines: true,
+                    encoding: "UTF-8", // Explicitly ask PapaParse to try UTF-8 first
                     complete: async (results) => {
                         const { data, errors, meta } = results;
 
@@ -1172,7 +1158,7 @@
                              return;
                         }
 
-                        const foundHeaders = meta.fields.map(h => h.trim());
+                        const foundHeaders = meta.fields.map(h => h ? h.trim() : '');
                         const requiredHeaders = ['QR Code', '戶號', '姓名'];
                         
                         const missingHeaders = requiredHeaders.filter(h => !foundHeaders.includes(h));
@@ -1255,7 +1241,7 @@
                         csvImportInput.value = '';
                     }
                 });
-            }
+            });
 
 
             // --- UI Update Functions ---
@@ -1596,4 +1582,3 @@
     </script>
 </body>
 </html>
-
