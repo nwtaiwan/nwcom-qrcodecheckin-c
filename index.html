@@ -1108,27 +1108,27 @@
             // --- CSV Import/Export ---
             document.getElementById('export-csv-btn').addEventListener('click', () => {
                 const headers = ['QR Code', '戶號', '姓名', '地址', '坪數', '區分權比例'];
-                const data = currentResidents.map(res => ({
-                    'QR Code': res.id,
-                    '戶號': res.householdId,
-                    '姓名': res.name,
-                    '地址': res.address || '',
-                    '坪數': res.area || '',
-                    '區分權比例': res.ratio || ''
-                }));
                 
-                let csvContent = headers.join(',') + '\n';
-                data.forEach(row => {
-                    const values = headers.map(header => {
-                        let value = (row[header] || '').toString();
-                        // Escape quotes and wrap in quotes if it contains a comma or quote
-                        if (value.includes('"') || value.includes(',')) {
-                            value = `"${value.replace(/"/g, '""')}"`;
-                        }
-                        return value;
-                    });
-                    csvContent += values.join(',') + '\n';
-                });
+                const escapeCsvField = (field) => {
+                    const str = String(field || '');
+                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
+                        return `"${str.replace(/"/g, '""')}"`;
+                    }
+                    return str;
+                };
+
+                const rows = currentResidents.map(res => 
+                    [
+                        escapeCsvField(res.id),
+                        escapeCsvField(res.householdId),
+                        escapeCsvField(res.name),
+                        escapeCsvField(res.address),
+                        escapeCsvField(res.area),
+                        escapeCsvField(res.ratio)
+                    ].join(',')
+                );
+
+                let csvContent = headers.join(',') + '\n' + rows.join('\n');
 
                 const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
@@ -1158,56 +1158,72 @@
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     const text = e.target.result;
-                    // Basic CSV parsing to handle quoted fields
-                    const parseCSV = (str) => {
-                        const arr = [];
-                        let quote = false;
-                        for (let row = 0, col = 0, c = 0; c < str.length; c++) {
-                            let cc = str[c], nc = str[c + 1];
-                            arr[row] = arr[row] || [];
-                            arr[row][col] = arr[row][col] || '';
-                            if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
-                            if (cc == '"') { quote = !quote; continue; }
-                            if (cc == ',' && !quote) { ++col; continue; }
-                            if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
-                            if (cc == '\n' && !quote) { ++row; col = 0; continue; }
-                            if (cc == '\r' && !quote) { ++row; col = 0; continue; }
-                            arr[row][col] += cc;
+                    
+                    const parseCsvRow = (row) => {
+                        const fields = [];
+                        let currentField = '';
+                        let inQuotedField = false;
+                        for (let i = 0; i < row.length; i++) {
+                            const char = row[i];
+                            if (char === '"') {
+                                if (inQuotedField && i + 1 < row.length && row[i+1] === '"') {
+                                    currentField += '"';
+                                    i++; // Skip the second quote
+                                } else {
+                                    inQuotedField = !inQuotedField;
+                                }
+                            } else if (char === ',' && !inQuotedField) {
+                                fields.push(currentField);
+                                currentField = '';
+                            } else {
+                                currentField += char;
+                            }
                         }
-                        return arr;
+                        fields.push(currentField);
+                        return fields;
                     };
 
-                    const rows = parseCSV(text);
+                    const rows = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(row => row.trim() !== '');
                     if(rows.length < 2) {
                         showInfoModal('匯入失敗', 'CSV檔案需要至少包含一行標題和一行資料。');
                         return;
                     }
 
-                    const headers = rows.shift().map(h => h.trim());
+                    const headers = parseCsvRow(rows.shift()).map(h => h.trim());
+                    const requiredHeaders = ['QR Code', '戶號', '姓名'];
+                    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
+                    if(missingHeaders.length > 0) {
+                        showInfoModal('匯入失敗', `CSV檔案缺少必要的標題欄位: ${missingHeaders.join(', ')}`);
+                        return;
+                    }
+                    
                     const headerMap = { 'QR Code': 'id', '戶號': 'householdId', '姓名': 'name', '地址': 'address', '坪數': 'area', '區分權比例': 'ratio' };
+                    const headerIndices = {};
+                    headers.forEach((header, index) => {
+                         const key = Object.keys(headerMap).find(k => k === header);
+                         if (key) headerIndices[headerMap[key]] = index;
+                    });
+                    
                     const residentsToUpload = [];
-
-                    for (const row of rows) {
-                        if (row.length === 0 || row.every(field => field.trim() === '')) continue;
-                        
-                        const resident = {};
-                        let id = '';
-                        headers.forEach((header, index) => {
-                            const key = headerMap[header];
-                            if (key) {
-                                const value = (row[index] || '').trim();
-                                if (key === 'id') id = value;
-                                else resident[key] = value;
-                            }
-                        });
-
+                    for (const rowStr of rows) {
+                        const values = parseCsvRow(rowStr);
+                        const id = values[headerIndices['id']];
                         if (id) {
-                            residentsToUpload.push({ id, data: resident });
+                            residentsToUpload.push({
+                                id: id,
+                                data: {
+                                    householdId: values[headerIndices['householdId']] || '',
+                                    name: values[headerIndices['name']] || '',
+                                    address: values[headerIndices['address']] || '',
+                                    area: values[headerIndices['area']] || '',
+                                    ratio: values[headerIndices['ratio']] || ''
+                                }
+                            });
                         }
                     }
 
                     if (residentsToUpload.length === 0) {
-                        showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。請檢查標題是否正確。');
+                        showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。請檢查標題和資料格式。');
                         return;
                     }
                     
@@ -1216,13 +1232,8 @@
                         residentsToUpload.forEach(res => {
                             const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
                             const finalData = {
-                                householdId: '',
-                                name: '',
-                                address: '',
-                                area: '',
-                                ratio: '',
-                                isCheckedIn: false,
-                                checkInTime: null,
+                                householdId: '', name: '', address: '', area: '', ratio: '',
+                                isCheckedIn: false, checkInTime: null,
                                 ...res.data
                             };
                             batch.set(residentRef, finalData, { merge: true });
