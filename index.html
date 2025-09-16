@@ -192,11 +192,12 @@
                 <div id="residents-tab" class="tab-pane hidden">
                     <div class="flex flex-wrap justify-between items-center mb-4 gap-2">
                         <h3 class="text-2xl font-semibold text-gray-700">住戶管理</h3>
-                        <div class="flex gap-2">
+                        <div class="flex gap-2 flex-wrap">
                             <input type="file" id="csv-import-input" class="hidden" accept=".csv">
                             <button id="import-csv-btn" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700"><i class="fas fa-file-import mr-2"></i>匯入 CSV</button>
                             <button id="export-csv-btn" class="bg-gray-600 text-white py-2 px-4 rounded-md hover:bg-gray-700"><i class="fas fa-file-export mr-2"></i>匯出 CSV</button>
                             <button id="view-qrcodes-btn" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700"><i class="fas fa-print mr-2"></i>產生 & 列印 QR Code</button>
+                            <button id="delete-all-residents-btn" class="bg-red-600 text-white py-2 px-4 rounded-md hover:bg-red-700"><i class="fas fa-trash-alt mr-2"></i>全部刪除</button>
                         </div>
                     </div>
                     <!-- Add Resident Form -->
@@ -1057,6 +1058,52 @@
                     }
                 }
             });
+            document.getElementById('delete-all-residents-btn').addEventListener('click', async () => {
+                if (!selectedCommunityId) return;
+
+                const confirmed = await showConfirmModal(
+                    '全部刪除確認',
+                    `您確定要刪除「${selectedCommunityName}」的所有住戶資料嗎？此動作無法復原！`,
+                    '確定全部刪除'
+                );
+
+                if (confirmed) {
+                    await deleteAllResidents();
+                }
+            });
+
+            async function deleteAllResidents() {
+                showInfoModal('刪除中...', '正在刪除所有住戶資料，請稍候...');
+                try {
+                    const residentsColRef = collection(db, 'communities', selectedCommunityId, 'residents');
+                    const snapshot = await getDocs(residentsColRef);
+                    
+                    if (snapshot.empty) {
+                        document.getElementById('info-modal-ok-btn').click();
+                        showInfoModal('完成', '沒有住戶資料可供刪除。');
+                        return;
+                    }
+
+                    const chunks = [];
+                    for (let i = 0; i < snapshot.docs.length; i += 500) {
+                        chunks.push(snapshot.docs.slice(i, i + 500));
+                    }
+
+                    for (const chunk of chunks) {
+                        const batch = writeBatch(db);
+                        chunk.forEach(doc => batch.delete(doc.ref));
+                        await batch.commit();
+                    }
+                    
+                    document.getElementById('info-modal-ok-btn').click();
+                    showInfoModal('成功', '所有住戶資料已成功刪除。');
+                } catch (error) {
+                    console.error("Error deleting all residents:", error);
+                    document.getElementById('info-modal-ok-btn').click();
+                    showInfoModal('錯誤', '刪除過程中發生錯誤，請稍後再試。');
+                }
+            }
+
 
             // --- CSV Import/Export ---
             document.getElementById('export-csv-btn').addEventListener('click', () => {
