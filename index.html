@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區Qode報到系統</title>
+    <title>西北社區QR Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -1427,27 +1427,20 @@
                 const scannerErrorEl = document.getElementById('scanner-error');
                 scannerErrorEl.textContent = '正在請求攝影機權限...';
 
-                try {
-                    await html5QrCode.start(
-                        { facingMode: "environment" },
-                        config,
-                        onScanSuccess,
-                        (errorMessage) => { /* ignore */ }
-                    );
+                const startCamera = async (config) => {
+                    await html5QrCode.start(config, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, (errorMessage) => {});
                     scannerErrorEl.textContent = '';
                     document.getElementById('stop-scanner-btn').classList.remove('hidden');
+                };
+
+                try {
+                    // Prioritize environment camera
+                    await startCamera({ facingMode: "environment" });
                 } catch (err) {
-                     try {
-                        // Fallback to any available camera if environment fails
-                        console.log("Fallback to default camera");
-                        await html5QrCode.start(
-                            undefined, // Let the library decide
-                            config,
-                            onScanSuccess,
-                            (errorMessage) => { /* ignore */ }
-                        );
-                        scannerErrorEl.textContent = '';
-                        document.getElementById('stop-scanner-btn').classList.remove('hidden');
+                    console.log("Environment camera failed, trying user camera.", err);
+                    try {
+                        // Fallback to user (front) camera
+                        await startCamera({ facingMode: "user" });
                     } catch (finalErr) {
                          if (finalErr.name === 'NotAllowedError') {
                              scannerErrorEl.textContent = '攝影機權限被拒絕。請至瀏覽器設定中允許本網站使用攝影機。';
@@ -1580,4 +1573,3 @@
     </script>
 </body>
 </html>
-
