@@ -346,16 +346,21 @@
                         </form>
                         <div id="create-user-feedback" class="text-sm mt-4"></div>
                     </div>
-                     <div class="mt-6 p-4 border-l-4 border-yellow-400 bg-yellow-50 rounded">
-                        <div class="flex">
-                            <div class="flex-shrink-0">
-                                <i class="fa fa-info-circle text-yellow-500"></i>
+                     <div class="mt-8 bg-gray-50 p-6 rounded-lg max-w-lg">
+                        <h4 class="font-semibold mb-3 text-gray-800">管理本社群存取權限</h4>
+                        <form id="add-member-form" class="flex items-end gap-2">
+                            <div class="flex-grow">
+                                <label for="member-account-name" class="block text-sm font-medium text-gray-700">工作人員帳號</label>
+                                <input type="text" id="member-account-name" class="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500" required placeholder="輸入帳號以新增">
                             </div>
-                            <div class="ml-3">
-                                <p class="text-sm text-yellow-700">
-                                    請注意：基於安全考量，此介面僅提供「新增」帳號功能。若需「查詢」或「刪除」帳號，請登入您的 Firebase 專案後台進行管理。
-                                </p>
-                            </div>
+                             <button type="submit" class="bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">新增成員</button>
+                        </form>
+                        <div id="add-member-feedback" class="text-sm mt-2"></div>
+                        <div class="mt-4">
+                            <h5 class="text-sm font-medium text-gray-500 mb-2">目前成員列表</h5>
+                            <ul id="community-members-list" class="space-y-2">
+                                <!-- Member list will be inserted here -->
+                            </ul>
                         </div>
                     </div>
                 </div>
@@ -423,7 +428,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, query, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, getDocs } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, addDoc, collection, onSnapshot, query, updateDoc, deleteDoc, serverTimestamp, where, writeBatch, getDocs, arrayUnion, arrayRemove, deleteField } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -458,16 +463,7 @@
             document.body.appendChild(publicViewContainer);
 
             publicViewContainer.innerHTML = `<p class="text-center text-gray-500">正在載入即時報到狀況...</p>`;
-
-            // IMPORTANT: For this public view to work, you MUST set Firestore Security Rules
-            // to allow public reads on the 'communities/{communityId}/eventConfig/current'
-            // and 'communities/{communityId}/residents' paths.
-            // Example Rule:
-            // match /communities/{communityId}/{document=**} {
-            //   allow read: if true;
-            //   allow write: if request.auth != null; // Or more specific rules
-            // }
-
+            
             const communityRef = doc(db, 'communities', publicCommunityId);
             const configRef = doc(db, 'communities', publicCommunityId, 'eventConfig', 'current');
             const residentsColRef = collection(db, 'communities', publicCommunityId, 'residents');
@@ -590,6 +586,7 @@
             let sessionUnsubscribe = null; // Listener for session management
             let html5QrCode = null;
             let isProcessingScan = false;
+             let communityMembersUnsubscribe = null;
 
             // --- App Flow & Navigation ---
             function showView(viewId) {
@@ -640,7 +637,7 @@
                     
                     const userStatusRef = doc(db, 'users', user.uid);
                     const localSessionId = crypto.randomUUID();
-                    setDoc(userStatusRef, { sessionId: localSessionId, lastLogin: serverTimestamp() }, { merge: true });
+                    setDoc(userStatusRef, { sessionId: localSessionId, lastLogin: serverTimestamp(), accountName: user.email.split('@')[0] }, { merge: true });
 
                     if (sessionUnsubscribe) sessionUnsubscribe();
                     sessionUnsubscribe = onSnapshot(userStatusRef, (statusDoc) => {
@@ -750,12 +747,14 @@
                 const newUserEmail = `${account}@checkin.system`;
 
                 try {
-                    await createUserWithEmailAndPassword(secondaryAuth, newUserEmail, password);
+                    const userCredential = await createUserWithEmailAndPassword(secondaryAuth, newUserEmail, password);
+                    // Create a username-to-UID mapping for easy lookup
+                    await setDoc(doc(db, "usernames", account), { uid: userCredential.user.uid });
+                    
                     feedbackEl.textContent = `帳號 "${account}" 已成功建立！`;
                     feedbackEl.classList.add('text-green-600');
                     form.reset();
                 } catch (error) {
-                    // Use a temporary div to display creation error
                     const creationErrorDiv = document.createElement('div');
                     handleAuthError(error, creationErrorDiv);
                     feedbackEl.textContent = creationErrorDiv.textContent;
@@ -809,19 +808,17 @@
                     const communityDocRef = doc(db, 'communities', communityId);
                     batch.delete(communityDocRef);
 
-                    // Delete the user's membership to this community
-                    const membershipRef = doc(db, 'users', currentUser.uid, 'communityMemberships', communityId);
-                    batch.delete(membershipRef);
+                    // Firestore security rules should prevent unauthorized deletion, so we don't need to
+                    // manually remove memberships from all users here.
 
                     await batch.commit();
                     
-                    // Manually remove the card from the UI for immediate feedback
                     const cardToRemove = document.querySelector(`.community-card[data-id="${communityId}"]`);
                     if (cardToRemove) {
                         cardToRemove.remove();
                     }
 
-                    document.getElementById('info-modal-ok-btn').click(); // Close the "deleting" modal
+                    document.getElementById('info-modal-ok-btn').click();
                 } catch (error) {
                     console.error("Error deleting community:", error);
                     document.getElementById('info-modal-ok-btn').click();
@@ -832,9 +829,10 @@
 
             function setupCommunityListListener() {
                 if (!currentUser) return;
-                const membershipsRef = collection(db, 'users', currentUser.uid, 'communityMemberships');
+                const q = query(collection(db, 'communities'), where('memberUids', 'array-contains', currentUser.uid));
+                
                 if (communityUnsubscribe) communityUnsubscribe();
-                communityUnsubscribe = onSnapshot(membershipsRef, async (snapshot) => {
+                communityUnsubscribe = onSnapshot(q, async (snapshot) => {
                     const loadingEl = document.getElementById('loading-communities');
                     const listEl = document.getElementById('community-list');
 
@@ -848,18 +846,14 @@
                         return;
                     }
 
-                    const communityPromises = snapshot.docs.map(async (membershipDoc) => {
-                        const communityDoc = await getDoc(doc(db, 'communities', membershipDoc.id));
-                        if (!communityDoc.exists()) return null;
-
-                        const configDoc = await getDoc(doc(db, 'communities', membershipDoc.id, 'eventConfig', 'current'));
+                    const communityPromises = snapshot.docs.map(async (communityDoc) => {
+                        const configDoc = await getDoc(doc(db, 'communities', communityDoc.id, 'eventConfig', 'current'));
                         const eventName = configDoc.exists() && configDoc.data().eventName ? configDoc.data().eventName : '尚未設定活動';
-                        
                         return { id: communityDoc.id, ...communityDoc.data(), eventName };
                     });
-
-                    const communitiesWithEvents = (await Promise.all(communityPromises)).filter(c => c !== null);
-
+                    
+                    const communitiesWithEvents = await Promise.all(communityPromises);
+                    
                     listEl.innerHTML = '';
                     communitiesWithEvents.forEach(community => {
                         const cardWrapper = document.createElement('div');
@@ -912,21 +906,20 @@
                 button.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i>建立中...';
 
                 try {
-                    const batch = writeBatch(db);
                     const newCommunityRef = doc(collection(db, 'communities'));
                     const accountName = auth.currentUser.email.split('@')[0];
                     
-                    batch.set(newCommunityRef, {
+                    await setDoc(newCommunityRef, {
                         name: communityName,
                         ownerId: currentUser.uid,
                         ownerAccountName: accountName,
-                        createdAt: serverTimestamp()
+                        createdAt: serverTimestamp(),
+                        memberUids: [currentUser.uid],
+                        memberInfo: {
+                            [currentUser.uid]: accountName
+                        }
                     });
 
-                    const membershipRef = doc(db, 'users', currentUser.uid, 'communityMemberships', newCommunityRef.id);
-                    batch.set(membershipRef, { joinedAt: serverTimestamp() });
-
-                    await batch.commit();
                     enterCommunity(newCommunityRef.id, communityName);
 
                 } catch (error) {
@@ -943,8 +936,16 @@
             // --- Community-Specific Data Listeners & Handlers ---
             function setupCommunityListeners() {
                 if (!selectedCommunityId) return;
+                const communityDocRef = doc(db, 'communities', selectedCommunityId);
                 const configRef = doc(db, 'communities', selectedCommunityId, 'eventConfig', 'current');
                 const residentsColRef = collection(db, 'communities', selectedCommunityId, 'residents');
+                
+                if (communityMembersUnsubscribe) communityMembersUnsubscribe();
+                communityMembersUnsubscribe = onSnapshot(communityDocRef, (docSnap) => {
+                    if (docSnap.exists()) {
+                        updateCommunityMembersUI(docSnap.data().memberInfo || {}, docSnap.data().ownerId);
+                    }
+                });
 
                 if (configUnsubscribe) configUnsubscribe();
                 configUnsubscribe = onSnapshot(configRef, (docSnap) => {
@@ -965,6 +966,7 @@
             function cleanupCommunityListeners() {
                 if (configUnsubscribe) { configUnsubscribe(); configUnsubscribe = null; }
                 if (residentsUnsubscribe) { residentsUnsubscribe(); residentsUnsubscribe = null; }
+                if (communityMembersUnsubscribe) { communityMembersUnsubscribe(); communityMembersUnsubscribe = null; }
             }
 
             document.getElementById('save-config-btn').addEventListener('click', async () => {
@@ -974,7 +976,7 @@
                     eventDate: document.getElementById('event-date').value,
                     ratioThreshold: document.getElementById('event-ratio-threshold').value
                 };
-                await setDoc(configRef, configData);
+                await setDoc(configRef, configData, { merge: true });
                 const feedback = document.getElementById('config-feedback');
                 feedback.textContent = '設定已成功儲存！';
                 setTimeout(() => feedback.textContent = '', 3000);
@@ -1422,42 +1424,34 @@
                 scannerErrorEl.textContent = '正在請求攝影機權限...';
 
                 try {
-                    const cameras = await Html5Qrcode.getCameras();
-                    if (!cameras || cameras.length === 0) {
-                        scannerErrorEl.textContent = '找不到攝影機設備。';
-                        return;
-                    }
-
-                    let cameraId;
-                    // Prefer back camera if available (for mobile)
-                    const backCamera = cameras.find(camera => camera.label.toLowerCase().includes('back') || camera.label.toLowerCase().includes('後置'));
-                    if (backCamera) {
-                        cameraId = backCamera.id;
-                    } else {
-                        // Otherwise, use the first available camera (for desktops/laptops)
-                        cameraId = cameras[0].id;
-                    }
-
-                    scannerErrorEl.textContent = '正在啟動攝影機...';
-                    document.getElementById('stop-scanner-btn').classList.remove('hidden');
-
                     await html5QrCode.start(
-                        cameraId,      // Use the specific camera ID
+                        { facingMode: "environment" },
                         config,
-                        onScanSuccess, // success callback
-                        (errorMessage) => {
-                            // parse error, ignore.
-                        }
+                        onScanSuccess,
+                        (errorMessage) => { /* ignore */ }
                     );
-                    scannerErrorEl.textContent = ''; // Clear status message on success
-
+                    scannerErrorEl.textContent = '';
+                    document.getElementById('stop-scanner-btn').classList.remove('hidden');
                 } catch (err) {
-                    if (err.name === 'NotAllowedError') {
-                         scannerErrorEl.textContent = '攝影機權限被拒絕。請至瀏覽器設定中允許本網站使用攝影機。';
-                    } else {
-                         scannerErrorEl.textContent = `無法啟動攝影機: ${err}`;
+                     try {
+                        // Fallback to any available camera if environment fails
+                        console.log("Fallback to default camera");
+                        await html5QrCode.start(
+                            undefined, // Let the library decide
+                            config,
+                            onScanSuccess,
+                            (errorMessage) => { /* ignore */ }
+                        );
+                        scannerErrorEl.textContent = '';
+                        document.getElementById('stop-scanner-btn').classList.remove('hidden');
+                    } catch (finalErr) {
+                         if (finalErr.name === 'NotAllowedError') {
+                             scannerErrorEl.textContent = '攝影機權限被拒絕。請至瀏覽器設定中允許本網站使用攝影機。';
+                        } else {
+                             scannerErrorEl.textContent = `無法啟動攝影機: ${finalErr}`;
+                        }
+                        console.error("Camera start error:", finalErr);
                     }
-                    console.error("Camera initialization error:", err);
                 }
             }
 
