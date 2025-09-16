@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區QR Code報到系統</title>
+    <title>西北社區QR報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -708,9 +708,10 @@
                     'auth/wrong-password': '帳號或密碼錯誤。',
                     'auth/email-already-in-use': '此帳號名稱已被使用。',
                     'auth/weak-password': '密碼強度不足，至少需要6個字元。',
-                    'auth/operation-not-allowed': '登入方式未啟用。請聯絡系統管理員。'
+                    'auth/operation-not-allowed': '登入方式未啟用。請聯絡系統管理員。',
+                    'auth/network-request-failed': '網路連線失敗。請檢查您的網路連線，或暫時停用廣告攔截器等瀏覽器擴充功能後再試一次。'
                 };
-                errorElement.textContent = errorMap[error.code] || '發生未知錯誤，請稍後再試。';
+                errorElement.textContent = errorMap[error.code] || `發生未知錯誤 (${error.code})，請稍後再試。`;
             }
 
             // --- User Creation (in Admin Panel) ---
