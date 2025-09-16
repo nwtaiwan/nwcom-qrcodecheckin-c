@@ -12,6 +12,8 @@
     <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
     <!-- QR Code scanning library -->
     <script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"></script>
+    <!-- Papa Parse for robust CSV handling -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
 
     <style>
         /* Custom styles */
@@ -1156,116 +1158,69 @@
 
                 showInfoModal('匯入中...', '正在處理CSV檔案，請稍候...');
 
-                const reader = new FileReader();
-                reader.onload = async (e) => {
-                    const text = e.target.result;
-                    
-                    // Robust CSV parser to handle quoted fields with commas
-                    const parseCSV = (str) => {
-                        const arr = [];
-                        let quote = false;  // 'true' means we're inside a quoted field
-                        let row = 0, col = 0, c = 0;
-                        let field = '';
-                        for (c = 0; c < str.length; c++) {
-                            let cc = str[c], nc = str[c + 1];
-                            arr[row] = arr[row] || [];
-                            arr[row][col] = arr[row][col] || '';
-                            if (cc == '"') {
-                                if (quote && nc == '"') { field += '"'; c++; continue; }
-                                quote = !quote;
-                                continue;
-                            }
-                            if (cc == ',' && !quote) {
-                                arr[row][col] = field;
-                                field = '';
-                                col++;
-                                continue;
-                            }
-                            if (cc == '\r' && nc == '\n' && !quote) {
-                                arr[row][col] = field;
-                                field = '';
-                                row++;
-                                col = 0;
-                                c++;
-                                continue;
-                            }
-                            if ( (cc == '\n' || cc == '\r') && !quote) {
-                                arr[row][col] = field;
-                                field = '';
-                                row++;
-                                col = 0;
-                                continue;
-                            }
-                            field += cc;
+                Papa.parse(file, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: async (results) => {
+                        const { data, errors, meta } = results;
+
+                        if (errors.length > 0) {
+                             console.error("CSV Parsing errors:", errors);
+                             showInfoModal('匯入失敗', `CSV檔案格式有誤，請檢查第 ${errors[0].row} 行。`);
+                             return;
                         }
-                        arr[row][col] = field;
-                        return arr;
-                    };
 
-                    const rows = parseCSV(text.replace(/^\uFEFF/, '')); // Remove BOM
+                        const requiredHeaders = ['QR Code', '戶號', '姓名'];
+                        const missingHeaders = requiredHeaders.filter(h => !meta.fields.includes(h));
+                        if (missingHeaders.length > 0) {
+                            showInfoModal('匯入失敗', `CSV檔案缺少必要的標題欄位: ${missingHeaders.join(', ')}`);
+                            return;
+                        }
 
-                    if(rows.length < 2 || (rows.length === 1 && rows[0].length <= 1)) {
-                        showInfoModal('匯入失敗', 'CSV檔案需要至少包含一行標題和一行資料。');
-                        return;
-                    }
-
-                    const headers = rows.shift().map(h => h.trim());
-                    const requiredHeaders = ['QR Code', '戶號', '姓名'];
-                    const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
-                    if(missingHeaders.length > 0) {
-                        showInfoModal('匯入失敗', `CSV檔案缺少必要的標題欄位: ${missingHeaders.join(', ')}`);
-                        return;
-                    }
-                    
-                    const headerMap = { 'QR Code': 'id', '戶號': 'householdId', '姓名': 'name', '地址': 'address', '坪數': 'area', '區分權比例': 'ratio' };
-                    const headerIndices = {};
-                    headers.forEach((header, index) => {
-                         const key = Object.keys(headerMap).find(k => k === header);
-                         if (key) headerIndices[headerMap[key]] = index;
-                    });
-                    
-                    const residentsToUpload = [];
-                    for (const values of rows) {
-                        if (values.length === 0 || values.every(field => (field || '').trim() === '')) continue;
-                        const id = (values[headerIndices['id']] || '').trim();
-                        if (id) {
-                            residentsToUpload.push({
+                        const residentsToUpload = data.map(row => {
+                            const id = row['QR Code']?.trim();
+                            if (!id) return null;
+                            return {
                                 id: id,
                                 data: {
-                                    householdId: (values[headerIndices['householdId']] || '').trim(),
-                                    name: (values[headerIndices['name']] || '').trim(),
-                                    address: (values[headerIndices['address']] || '').trim(),
-                                    area: (values[headerIndices['area']] || '').trim(),
-                                    ratio: (values[headerIndices['ratio']] || '').trim()
+                                    householdId: row['戶號']?.trim() || '',
+                                    name: row['姓名']?.trim() || '',
+                                    address: row['地址']?.trim() || '',
+                                    area: row['坪數']?.trim() || '',
+                                    ratio: row['區分權比例']?.trim() || ''
                                 }
-                            });
-                        }
-                    }
-
-                    if (residentsToUpload.length === 0) {
-                        showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。請檢查標題和資料格式。');
-                        return;
-                    }
-                    
-                    try {
-                        const batch = writeBatch(db);
-                        residentsToUpload.forEach(res => {
-                            const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
-                            const finalData = {
-                                householdId: '', name: '', address: '', area: '', ratio: '',
-                                isCheckedIn: false, checkInTime: null,
-                                ...res.data
                             };
-                            batch.set(residentRef, finalData, { merge: true });
-                        });
-                        await batch.commit();
-                        showInfoModal('匯入成功', `成功匯入或更新了 ${residentsToUpload.length} 筆住戶資料。`);
-                    } catch (err) {
-                        console.error("CSV Import Error:", err);
-                        showInfoModal('匯入失敗', `處理過程中發生錯誤: ${err.message}`);
+                        }).filter(Boolean); // Filter out null entries
+
+                        if (residentsToUpload.length === 0) {
+                            showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。請檢查QR Code欄位是否都有填寫。');
+                            return;
+                        }
+                        
+                        try {
+                            const batch = writeBatch(db);
+                            residentsToUpload.forEach(res => {
+                                const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
+                                const finalData = {
+                                    isCheckedIn: false,
+                                    checkInTime: null,
+                                    ...res.data
+                                };
+                                batch.set(residentRef, finalData, { merge: true });
+                            });
+                            await batch.commit();
+                            showInfoModal('匯入成功', `成功匯入或更新了 ${residentsToUpload.length} 筆住戶資料。`);
+                        } catch (err) {
+                            console.error("CSV Import Error:", err);
+                            showInfoModal('匯入失敗', `處理過程中發生錯誤: ${err.message}`);
+                        }
+                    },
+                    error: (err) => {
+                        console.error("Papa Parse Error:", err);
+                        showInfoModal('匯入失敗', '讀取CSV檔案時發生錯誤。');
                     }
-                };
-                reader.readAsText(file, 'UTF-8');
+                });
+
                 csvImportInput.value = ''; // Reset for next import
             });
 
