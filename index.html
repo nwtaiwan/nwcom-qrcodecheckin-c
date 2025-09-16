@@ -1111,6 +1111,7 @@
                 
                 const escapeCsvField = (field) => {
                     const str = String(field || '');
+                    // Escape quotes and wrap in quotes if it contains a comma, quote, or newline
                     if (str.includes(',') || str.includes('"') || str.includes('\n')) {
                         return `"${str.replace(/"/g, '""')}"`;
                     }
@@ -1128,7 +1129,7 @@
                     ].join(',')
                 );
 
-                let csvContent = headers.join(',') + '\n' + rows.join('\n');
+                let csvContent = headers.join(',') + '\r\n' + rows.join('\r\n');
 
                 const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
@@ -1159,37 +1160,56 @@
                 reader.onload = async (e) => {
                     const text = e.target.result;
                     
-                    const parseCsvRow = (row) => {
-                        const fields = [];
-                        let currentField = '';
-                        let inQuotedField = false;
-                        for (let i = 0; i < row.length; i++) {
-                            const char = row[i];
-                            if (char === '"') {
-                                if (inQuotedField && i + 1 < row.length && row[i+1] === '"') {
-                                    currentField += '"';
-                                    i++; // Skip the second quote
-                                } else {
-                                    inQuotedField = !inQuotedField;
-                                }
-                            } else if (char === ',' && !inQuotedField) {
-                                fields.push(currentField);
-                                currentField = '';
-                            } else {
-                                currentField += char;
+                    // Robust CSV parser to handle quoted fields with commas
+                    const parseCSV = (str) => {
+                        const arr = [];
+                        let quote = false;  // 'true' means we're inside a quoted field
+                        let row = 0, col = 0, c = 0;
+                        let field = '';
+                        for (c = 0; c < str.length; c++) {
+                            let cc = str[c], nc = str[c + 1];
+                            arr[row] = arr[row] || [];
+                            arr[row][col] = arr[row][col] || '';
+                            if (cc == '"') {
+                                if (quote && nc == '"') { field += '"'; c++; continue; }
+                                quote = !quote;
+                                continue;
                             }
+                            if (cc == ',' && !quote) {
+                                arr[row][col] = field;
+                                field = '';
+                                col++;
+                                continue;
+                            }
+                            if (cc == '\r' && nc == '\n' && !quote) {
+                                arr[row][col] = field;
+                                field = '';
+                                row++;
+                                col = 0;
+                                c++;
+                                continue;
+                            }
+                            if ( (cc == '\n' || cc == '\r') && !quote) {
+                                arr[row][col] = field;
+                                field = '';
+                                row++;
+                                col = 0;
+                                continue;
+                            }
+                            field += cc;
                         }
-                        fields.push(currentField);
-                        return fields;
+                        arr[row][col] = field;
+                        return arr;
                     };
 
-                    const rows = text.replace(/^\uFEFF/, '').replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(row => row.trim() !== '');
-                    if(rows.length < 2) {
+                    const rows = parseCSV(text.replace(/^\uFEFF/, '')); // Remove BOM
+
+                    if(rows.length < 2 || (rows.length === 1 && rows[0].length <= 1)) {
                         showInfoModal('匯入失敗', 'CSV檔案需要至少包含一行標題和一行資料。');
                         return;
                     }
 
-                    const headers = parseCsvRow(rows.shift()).map(h => h.trim());
+                    const headers = rows.shift().map(h => h.trim());
                     const requiredHeaders = ['QR Code', '戶號', '姓名'];
                     const missingHeaders = requiredHeaders.filter(h => !headers.includes(h));
                     if(missingHeaders.length > 0) {
@@ -1205,18 +1225,18 @@
                     });
                     
                     const residentsToUpload = [];
-                    for (const rowStr of rows) {
-                        const values = parseCsvRow(rowStr);
-                        const id = values[headerIndices['id']];
+                    for (const values of rows) {
+                        if (values.length === 0 || values.every(field => (field || '').trim() === '')) continue;
+                        const id = (values[headerIndices['id']] || '').trim();
                         if (id) {
                             residentsToUpload.push({
                                 id: id,
                                 data: {
-                                    householdId: values[headerIndices['householdId']] || '',
-                                    name: values[headerIndices['name']] || '',
-                                    address: values[headerIndices['address']] || '',
-                                    area: values[headerIndices['area']] || '',
-                                    ratio: values[headerIndices['ratio']] || ''
+                                    householdId: (values[headerIndices['householdId']] || '').trim(),
+                                    name: (values[headerIndices['name']] || '').trim(),
+                                    address: (values[headerIndices['address']] || '').trim(),
+                                    area: (values[headerIndices['area']] || '').trim(),
+                                    ratio: (values[headerIndices['ratio']] || '').trim()
                                 }
                             });
                         }
@@ -1308,9 +1328,8 @@
             });
 
             function updateStatusUI(residents) {
-                const totalResidentsEl = document.getElementById('total-residents');
-                // The most reliable check: if this element doesn't exist, the whole view is gone.
-                if (!totalResidentsEl) {
+                // Guard against calls when the view is not active
+                if (!document.getElementById('status-tab') || document.getElementById('status-tab').classList.contains('hidden')) {
                     return;
                 }
 
@@ -1328,7 +1347,7 @@
                 const checkedInRatio = checkedInList.reduce((sum, r) => sum + safeParseFloat(r.ratio), 0);
                 const ratioPercentage = totalRatio > 0 ? Math.round((checkedInRatio / totalRatio) * 100) : 0;
 
-                totalResidentsEl.textContent = total;
+                document.getElementById('total-residents').textContent = total;
                 document.getElementById('checked-in-count').textContent = checkedInCount;
                 document.getElementById('not-checked-in-count').textContent = notCheckedInCount;
                 document.getElementById('ratio-check-in-percentage').textContent = `${ratioPercentage}%`;
