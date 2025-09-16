@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區QR Code報到系統</title>
+    <title>西北社區 Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -1110,28 +1110,16 @@
             // --- CSV Import/Export ---
             document.getElementById('export-csv-btn').addEventListener('click', () => {
                 const headers = ['QR Code', '戶號', '姓名', '地址', '坪數', '區分權比例'];
+                const dataToExport = currentResidents.map(res => ({
+                    'QR Code': res.id,
+                    '戶號': res.householdId,
+                    '姓名': res.name,
+                    '地址': res.address || '',
+                    '坪數': res.area || '',
+                    '區分權比例': res.ratio || ''
+                }));
                 
-                const escapeCsvField = (field) => {
-                    const str = String(field || '');
-                    // Escape quotes and wrap in quotes if it contains a comma, quote, or newline
-                    if (str.includes(',') || str.includes('"') || str.includes('\n')) {
-                        return `"${str.replace(/"/g, '""')}"`;
-                    }
-                    return str;
-                };
-
-                const rows = currentResidents.map(res => 
-                    [
-                        escapeCsvField(res.id),
-                        escapeCsvField(res.householdId),
-                        escapeCsvField(res.name),
-                        escapeCsvField(res.address),
-                        escapeCsvField(res.area),
-                        escapeCsvField(res.ratio)
-                    ].join(',')
-                );
-
-                let csvContent = headers.join(',') + '\r\n' + rows.join('\r\n');
+                const csvContent = Papa.unparse(dataToExport, { headers: true });
 
                 const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
                 const link = document.createElement("a");
