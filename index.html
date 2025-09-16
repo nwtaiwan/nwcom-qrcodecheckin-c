@@ -1309,7 +1309,8 @@
 
             function updateStatusUI(residents) {
                 // Guard against calls when the view is not active
-                if (!document.getElementById('status-tab') || document.getElementById('status-tab').classList.contains('hidden')) {
+                const statusTab = document.getElementById('status-tab');
+                if (!statusTab || statusTab.classList.contains('hidden')) {
                     return;
                 }
 
