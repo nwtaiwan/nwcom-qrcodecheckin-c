@@ -244,7 +244,8 @@
                                     <th class="text-left py-3 px-4 font-semibold text-sm">地址</th>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">坪數</th>
                                     <th class="text-left py-3 px-4 font-semibold text-sm">區分權比例</th>
-                                    <th class="text-left py-3 px-4 font-semibold text-sm">操作</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">手動報到</th>
+                                    <th class="text-left py-3 px-4 font-semibold text-sm">刪除</th>
                                 </tr>
                             </thead>
                             <tbody id="resident-list" class="text-gray-700"></tbody>
@@ -1028,13 +1029,31 @@
             });
 
             document.getElementById('resident-list').addEventListener('click', async (e) => {
-                const btn = e.target.closest('.delete-resident-btn');
-                if (btn) {
-                    const residentId = btn.dataset.id;
+                const deleteBtn = e.target.closest('.delete-resident-btn');
+                const toggleBtn = e.target.closest('.toggle-checkin-btn');
+
+                if (deleteBtn) {
+                    const residentId = deleteBtn.dataset.id;
                     const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', residentId);
                     const confirmed = await showConfirmModal('刪除住戶', `您確定要刪除 QR Code 為 "${residentId}" 的住戶嗎？`, '確定刪除');
                     if (confirmed) {
                         await deleteDoc(residentRef);
+                    }
+                } else if (toggleBtn) {
+                    const residentId = toggleBtn.dataset.id;
+                    const currentStatus = toggleBtn.dataset.status === 'true';
+                    const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', residentId);
+                    
+                    const actionText = currentStatus ? '取消報到' : '設為報到';
+                    const confirmed = await showConfirmModal('手動更改狀態', `您確定要將此住戶狀態更改為「${actionText}」嗎？`, '確定');
+                    
+                    if (confirmed) {
+                        const newStatus = !currentStatus;
+                        const updateData = {
+                            isCheckedIn: newStatus,
+                            checkInTime: newStatus ? serverTimestamp() : null
+                        };
+                        await updateDoc(residentRef, updateData);
                     }
                 }
             });
@@ -1054,9 +1073,10 @@
                 let csvContent = headers.join(',') + '\n';
                 data.forEach(row => {
                     const values = headers.map(header => {
-                        let value = row[header].toString();
-                        if (value.includes(',')) {
-                            value = `"${value}"`;
+                        let value = (row[header] || '').toString();
+                        // Escape quotes and wrap in quotes if it contains a comma or quote
+                        if (value.includes('"') || value.includes(',')) {
+                            value = `"${value.replace(/"/g, '""')}"`;
                         }
                         return value;
                     });
@@ -1091,21 +1111,46 @@
                 const reader = new FileReader();
                 reader.onload = async (e) => {
                     const text = e.target.result;
-                    const rows = text.split('\n').filter(row => row.trim() !== '');
-                    const headers = rows.shift().split(',').map(h => h.trim());
-                    
+                    // Basic CSV parsing to handle quoted fields
+                    const parseCSV = (str) => {
+                        const arr = [];
+                        let quote = false;
+                        for (let row = 0, col = 0, c = 0; c < str.length; c++) {
+                            let cc = str[c], nc = str[c + 1];
+                            arr[row] = arr[row] || [];
+                            arr[row][col] = arr[row][col] || '';
+                            if (cc == '"' && quote && nc == '"') { arr[row][col] += cc; ++c; continue; }
+                            if (cc == '"') { quote = !quote; continue; }
+                            if (cc == ',' && !quote) { ++col; continue; }
+                            if (cc == '\r' && nc == '\n' && !quote) { ++row; col = 0; ++c; continue; }
+                            if (cc == '\n' && !quote) { ++row; col = 0; continue; }
+                            if (cc == '\r' && !quote) { ++row; col = 0; continue; }
+                            arr[row][col] += cc;
+                        }
+                        return arr;
+                    };
+
+                    const rows = parseCSV(text);
+                    if(rows.length < 2) {
+                        showInfoModal('匯入失敗', 'CSV檔案需要至少包含一行標題和一行資料。');
+                        return;
+                    }
+
+                    const headers = rows.shift().map(h => h.trim());
                     const headerMap = { 'QR Code': 'id', '戶號': 'householdId', '姓名': 'name', '地址': 'address', '坪數': 'area', '區分權比例': 'ratio' };
                     const residentsToUpload = [];
 
                     for (const row of rows) {
-                        const values = row.split(',');
+                        if (row.length === 0 || row.every(field => field.trim() === '')) continue;
+                        
                         const resident = {};
                         let id = '';
                         headers.forEach((header, index) => {
                             const key = headerMap[header];
                             if (key) {
-                                if (key === 'id') id = values[index].trim();
-                                else resident[key] = values[index].trim();
+                                const value = (row[index] || '').trim();
+                                if (key === 'id') id = value;
+                                else resident[key] = value;
                             }
                         });
 
@@ -1115,7 +1160,7 @@
                     }
 
                     if (residentsToUpload.length === 0) {
-                        showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。');
+                        showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。請檢查標題是否正確。');
                         return;
                     }
                     
@@ -1124,11 +1169,16 @@
                         residentsToUpload.forEach(res => {
                             const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
                             const finalData = {
-                                isCheckedIn: false, // Default values
+                                householdId: '',
+                                name: '',
+                                address: '',
+                                area: '',
+                                ratio: '',
+                                isCheckedIn: false,
                                 checkInTime: null,
-                                ...res.data // Overwrite with CSV data
+                                ...res.data
                             };
-                            batch.set(residentRef, finalData, { merge: true }); // Use merge to avoid overwriting check-in status if not provided
+                            batch.set(residentRef, finalData, { merge: true });
                         });
                         await batch.commit();
                         showInfoModal('匯入成功', `成功匯入或更新了 ${residentsToUpload.length} 筆住戶資料。`);
@@ -1137,7 +1187,7 @@
                         showInfoModal('匯入失敗', `處理過程中發生錯誤: ${err.message}`);
                     }
                 };
-                reader.readAsText(file);
+                reader.readAsText(file, 'UTF-8');
                 csvImportInput.value = ''; // Reset for next import
             });
 
@@ -1161,6 +1211,10 @@
                 list.innerHTML = ''; 
                 residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
                     const row = document.createElement('tr');
+                    const checkInButton = res.isCheckedIn 
+                        ? `<button data-id="${res.id}" data-status="true" class="toggle-checkin-btn text-xs py-1 px-2 rounded bg-yellow-500 text-white hover:bg-yellow-600">取消報到</button>`
+                        : `<button data-id="${res.id}" data-status="false" class="toggle-checkin-btn text-xs py-1 px-2 rounded bg-green-500 text-white hover:bg-green-600">報到</button>`;
+
                     row.innerHTML = `
                         <td class="py-3 px-4 font-mono text-xs">${res.id}</td>
                         <td class="py-3 px-4">${res.householdId}</td>
@@ -1168,6 +1222,7 @@
                         <td class="py-3 px-4">${res.address || '---'}</td>
                         <td class="py-3 px-4">${res.area || '---'}</td>
                         <td class="py-3 px-4">${res.ratio || '---'}</td>
+                        <td class="py-3 px-4">${checkInButton}</td>
                         <td class="py-3 px-4">
                             <button data-id="${res.id}" class="delete-resident-btn text-red-500 hover:text-red-700"><i class="fas fa-trash-alt"></i></button>
                         </td>
