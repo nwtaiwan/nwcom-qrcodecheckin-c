@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區QR Code報到系統</title>
+    <title>西北社區Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -1161,19 +1161,27 @@
                 Papa.parse(file, {
                     header: true,
                     skipEmptyLines: true,
+                    encoding: "UTF-8", // Explicitly ask PapaParse to try UTF-8 first
                     complete: async (results) => {
                         const { data, errors, meta } = results;
 
                         if (errors.length > 0) {
                              console.error("CSV Parsing errors:", errors);
-                             showInfoModal('匯入失敗', `CSV檔案格式有誤，請檢查第 ${errors[0].row} 行。`);
+                             showInfoModal('匯入失敗', `CSV檔案格式有誤，請檢查第 ${errors[0].row} 行。 錯誤訊息: ${errors[0].message}`);
+                             csvImportInput.value = '';
                              return;
                         }
 
+                        const foundHeaders = meta.fields.map(h => h.trim());
                         const requiredHeaders = ['QR Code', '戶號', '姓名'];
-                        const missingHeaders = requiredHeaders.filter(h => !meta.fields.includes(h));
+                        
+                        // Check if all required headers are present
+                        const missingHeaders = requiredHeaders.filter(h => !foundHeaders.includes(h));
+                        
                         if (missingHeaders.length > 0) {
-                            showInfoModal('匯入失敗', `CSV檔案缺少必要的標題欄位: ${missingHeaders.join(', ')}`);
+                            let friendlyMessage = `匯入失敗。\n\n系統找不到必要的標題欄位：\n[${missingHeaders.join(', ')}]\n\n您的檔案標題為：\n[${foundHeaders.join(', ')}]\n\n請確認您的CSV檔是以 UTF-8 編碼儲存，且標題名稱與匯出的檔案完全一致。`;
+                            showInfoModal('匯入失敗', friendlyMessage);
+                            csvImportInput.value = '';
                             return;
                         }
 
@@ -1190,38 +1198,49 @@
                                     ratio: row['區分權比例']?.trim() || ''
                                 }
                             };
-                        }).filter(Boolean); // Filter out null entries
+                        }).filter(Boolean); // Filter out rows without a QR Code ID
 
                         if (residentsToUpload.length === 0) {
                             showInfoModal('匯入失敗', 'CSV檔案中沒有可匯入的有效資料。請檢查QR Code欄位是否都有填寫。');
+                            csvImportInput.value = '';
                             return;
                         }
                         
                         try {
-                            const batch = writeBatch(db);
-                            residentsToUpload.forEach(res => {
-                                const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
-                                const finalData = {
-                                    isCheckedIn: false,
-                                    checkInTime: null,
-                                    ...res.data
-                                };
-                                batch.set(residentRef, finalData, { merge: true });
-                            });
-                            await batch.commit();
+                            // Firestore limits writes in a single batch to 500. We need to chunk the uploads.
+                            const chunks = [];
+                            for (let i = 0; i < residentsToUpload.length; i += 500) {
+                                chunks.push(residentsToUpload.slice(i, i + 500));
+                            }
+
+                            for (const chunk of chunks) {
+                                const batch = writeBatch(db);
+                                chunk.forEach(res => {
+                                    const residentRef = doc(db, 'communities', selectedCommunityId, 'residents', res.id);
+                                    const finalData = {
+                                        isCheckedIn: false,
+                                        checkInTime: null,
+                                        ...res.data
+                                    };
+                                    batch.set(residentRef, finalData, { merge: true });
+                                });
+                                await batch.commit();
+                            }
+                            
                             showInfoModal('匯入成功', `成功匯入或更新了 ${residentsToUpload.length} 筆住戶資料。`);
                         } catch (err) {
                             console.error("CSV Import Error:", err);
                             showInfoModal('匯入失敗', `處理過程中發生錯誤: ${err.message}`);
+                        } finally {
+                            csvImportInput.value = ''; // Reset for next import
                         }
                     },
                     error: (err) => {
                         console.error("Papa Parse Error:", err);
-                        showInfoModal('匯入失敗', '讀取CSV檔案時發生錯誤。');
+                        showInfoModal('匯入失敗', `讀取CSV檔案時發生錯誤: ${err.message}`);
+                        csvImportInput.value = '';
                     }
                 });
-
-                csvImportInput.value = ''; // Reset for next import
             });
 
 
