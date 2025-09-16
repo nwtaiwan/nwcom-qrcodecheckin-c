@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區 Code報到系統</title>
+    <title>西北社區QR Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -1153,12 +1153,13 @@
                 };
                 reader.onerror = () => {
                     showInfoModal('匯入失敗', '讀取檔案時發生錯誤。');
+                    csvImportInput.value = '';
                 };
                 reader.readAsText(file, 'UTF-8');
             });
 
             async function processCsvText(csvText) {
-                Papa.parse(csvText, {
+                Papa.parse(csvText.trim(), {
                     header: true,
                     skipEmptyLines: true,
                     complete: async (results) => {
@@ -1166,7 +1167,7 @@
 
                         if (errors.length > 0) {
                              console.error("CSV Parsing errors:", errors);
-                             showInfoModal('匯入失敗', `CSV檔案格式有誤，請檢查第 ${errors[0].row} 行。\n\n錯誤訊息: ${errors[0].message}`);
+                             showInfoModal('匯入失敗', `CSV檔案格式有誤，請檢查第 ${errors[0].row + 2} 行。\n\n錯誤訊息: ${errors[0].message}`);
                              csvImportInput.value = '';
                              return;
                         }
