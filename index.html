@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區QR Code報到系統</title>
+    <title>西北社區Code報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -807,10 +807,7 @@
                     // Delete the main community document
                     const communityDocRef = doc(db, 'communities', communityId);
                     batch.delete(communityDocRef);
-
-                    // Firestore security rules should prevent unauthorized deletion, so we don't need to
-                    // manually remove memberships from all users here.
-
+                    
                     await batch.commit();
                     
                     const cardToRemove = document.querySelector(`.community-card[data-id="${communityId}"]`);
@@ -829,7 +826,7 @@
 
             function setupCommunityListListener() {
                 if (!currentUser) return;
-                const q = query(collection(db, 'communities'), where('memberUids', 'array-contains', currentUser.uid));
+                const q = query(collection(db, 'communities'));
                 
                 if (communityUnsubscribe) communityUnsubscribe();
                 communityUnsubscribe = onSnapshot(q, async (snapshot) => {
@@ -857,15 +854,22 @@
                     listEl.innerHTML = '';
                     communitiesWithEvents.forEach(community => {
                         const cardWrapper = document.createElement('div');
-                        cardWrapper.className = 'community-card p-6 rounded-lg shadow border border-gray-200 hover:shadow-md hover:border-blue-500 cursor-pointer transition-all relative';
+                        const isMember = community.memberUids && community.memberUids.includes(currentUser.uid);
+                        const isOwner = community.ownerId === currentUser.uid;
+
+                        cardWrapper.className = `community-card p-6 rounded-lg shadow border border-gray-200 transition-all relative ${isMember ? 'hover:shadow-md hover:border-blue-500 cursor-pointer' : 'opacity-60 cursor-not-allowed'}`;
                         cardWrapper.dataset.id = community.id;
                         cardWrapper.dataset.name = community.name;
                         const createdAtDate = community.createdAt ? new Date(community.createdAt.seconds * 1000).toLocaleDateString('zh-TW') : '未知日期';
+                        const deleteButtonHtml = isOwner
+                            ? `<button data-id="${community.id}" data-name="${community.name}" class="delete-community-btn absolute top-2 right-2 text-gray-400 hover:text-red-600 focus:outline-none p-1 z-10">
+                                   <i class="fas fa-trash-alt"></i>
+                               </button>`
+                            : '';
+
 
                         cardWrapper.innerHTML = `
-                            <button data-id="${community.id}" data-name="${community.name}" class="delete-community-btn absolute top-2 right-2 text-gray-400 hover:text-red-600 focus:outline-none p-1 z-10">
-                                <i class="fas fa-trash-alt"></i>
-                            </button>
+                            ${deleteButtonHtml}
                             <div class="flex items-center">
                                 <i class="fas fa-building text-blue-500 text-2xl mr-4"></i>
                                 <div>
