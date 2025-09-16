@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區QR Code報到系統</title>
+    <title>西北社區QR報到系統</title>
     <!-- Tailwind CSS for styling -->
     <script src="https://cdn.tailwindcss.com"></script>
     <!-- Font Awesome for icons -->
@@ -1181,7 +1181,7 @@
    (如果沒有此選項，請見下方備註)
 4. 儲存檔案後，再重新匯入。
 
-備註：若您的 Excel 版本較舊，沒有「CSV UTF-8」選項，請在「另存新檔」視窗中，點擊下方的「工具」按鈕，選擇「Web 選項」，然後在「編碼」分頁中選擇「Unicode (UTF-8)」。
+備註：若您的 Excel 版本較旧，沒有「CSV UTF-8」選項，請在「另存新檔」視窗中，點擊下方的「工具」按鈕，選擇「Web 選項」，然後在「編碼」分頁中選擇「Unicode (UTF-8)」。
 
 ---
 偵測到的標題為：
@@ -1266,8 +1266,12 @@
                 const list = document.getElementById('resident-list');
                 if (!list) return; // Guard clause
 
+                const naturalSort = (a, b) => {
+                    return a.localeCompare(b, undefined, {numeric: true, sensitivity: 'base'});
+                };
+
                 list.innerHTML = ''; 
-                residents.sort((a,b) => a.householdId.localeCompare(b.householdId)).forEach(res => {
+                residents.sort((a,b) => naturalSort(a.householdId, b.householdId)).forEach(res => {
                     const row = document.createElement('tr');
                     const checkInButton = res.isCheckedIn 
                         ? `<button data-id="${res.id}" data-status="true" class="toggle-checkin-btn text-xs py-1 px-2 rounded bg-yellow-500 text-white hover:bg-yellow-600">取消報到</button>`
@@ -1427,20 +1431,27 @@
                 const scannerErrorEl = document.getElementById('scanner-error');
                 scannerErrorEl.textContent = '正在請求攝影機權限...';
 
-                const startCamera = async (config) => {
-                    await html5QrCode.start(config, { fps: 10, qrbox: { width: 250, height: 250 } }, onScanSuccess, (errorMessage) => {});
+                try {
+                    await html5QrCode.start(
+                        { facingMode: "environment" },
+                        config,
+                        onScanSuccess,
+                        (errorMessage) => { /* ignore */ }
+                    );
                     scannerErrorEl.textContent = '';
                     document.getElementById('stop-scanner-btn').classList.remove('hidden');
-                };
-
-                try {
-                    // Prioritize environment camera
-                    await startCamera({ facingMode: "environment" });
                 } catch (err) {
-                    console.log("Environment camera failed, trying user camera.", err);
-                    try {
-                        // Fallback to user (front) camera
-                        await startCamera({ facingMode: "user" });
+                     try {
+                        // Fallback to any available camera if environment fails
+                        console.log("Fallback to default camera");
+                        await html5QrCode.start(
+                            undefined, // Let the library decide
+                            config,
+                            onScanSuccess,
+                            (errorMessage) => { /* ignore */ }
+                        );
+                        scannerErrorEl.textContent = '';
+                        document.getElementById('stop-scanner-btn').classList.remove('hidden');
                     } catch (finalErr) {
                          if (finalErr.name === 'NotAllowedError') {
                              scannerErrorEl.textContent = '攝影機權限被拒絕。請至瀏覽器設定中允許本網站使用攝影機。';
