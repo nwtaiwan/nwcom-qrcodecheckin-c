@@ -135,9 +135,8 @@
 
             <!-- Tab Content -->
             <div id="tab-content">
-                <!-- Dashboard, Resident Management, Scanner, Settings content remains the same -->
                  <!-- Dashboard -->
-                <div id="dashboard-content" class="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div id="dashboard-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
                      <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
                         <div>
                             <p class="text-sm font-medium text-gray-500">總住戶數</p>
@@ -152,23 +151,31 @@
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">報到率</p>
+                            <p class="text-sm font-medium text-gray-500">人數報到率</p>
                             <p id="check-in-rate" class="text-3xl font-bold text-orange-600">0%</p>
                         </div>
                     </div>
-                    <div class="md:col-span-3 bg-white p-6 rounded-xl shadow-md">
-                        <h3 class="text-lg font-semibold mb-4">最近報到紀錄</h3>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">區分權報到率</p>
+                            <p id="ownership-check-in-rate" class="text-3xl font-bold text-blue-600">0%</p>
+                        </div>
+                    </div>
+                    <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-md">
+                        <div class="flex justify-between items-center mb-4">
+                            <h3 class="text-lg font-semibold">最近報到紀錄</h3>
+                            <span id="quorum-message" class="hidden text-green-600 font-bold">已達法定開會區分權比例人數</span>
+                        </div>
                         <div class="overflow-x-auto">
                             <table class="min-w-full">
                                 <thead class="bg-gray-50">
                                     <tr>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到時間</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到日期時間</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recent-check-ins-list" class="bg-white divide-y divide-gray-200">
-                                    <tr><td colspan="3" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>
+                                    <tr><td colspan="2" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -179,8 +186,9 @@
                 <div id="residents-content" class="hidden">
                     <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
                         <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-md">
-                            <h3 class="text-lg font-semibold mb-4">新增住戶</h3>
+                            <h3 class="text-lg font-semibold mb-4">新增/修改住戶</h3>
                             <form id="add-resident-form">
+                                <input type="hidden" id="resident-id">
                                 <div class="mb-4">
                                     <label for="resident-unit" class="block text-sm font-medium text-gray-700">戶號 (例如: A-1201)</label>
                                     <input type="text" id="resident-unit" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
@@ -189,7 +197,12 @@
                                     <label for="resident-name" class="block text-sm font-medium text-gray-700">姓名</label>
                                     <input type="text" id="resident-name" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
                                 </div>
-                                <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">新增住戶</button>
+                                <div class="mb-4">
+                                    <label for="resident-ownership" class="block text-sm font-medium text-gray-700">區分權比例 (%)</label>
+                                    <input type="number" id="resident-ownership" step="0.01" min="0" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: 0.85">
+                                </div>
+                                <button type="submit" id="add-resident-btn" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">新增住戶</button>
+                                <button type="button" id="cancel-edit-btn" class="hidden w-full mt-2 bg-gray-500 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-600">取消編輯</button>
                             </form>
                         </div>
                         <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md">
@@ -203,6 +216,7 @@
                                         <tr>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">區分權比例</th>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
                                             <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                         </tr>
@@ -250,9 +264,13 @@
                                 <label for="event-name" class="block text-sm font-medium text-gray-700">會議/活動名稱</label>
                                 <input type="text" id="event-name" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
                             </div>
-                             <div class="mb-6">
+                             <div class="mb-4">
                                 <label for="event-date" class="block text-sm font-medium text-gray-700">活動日期與時間</label>
                                 <input type="datetime-local" id="event-date" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                            </div>
+                            <div class="mb-6">
+                                <label for="ownership-ratio" class="block text-sm font-medium text-gray-700">法定開會區分權比例 (%)</label>
+                                <input type="number" id="ownership-ratio" step="0.01" min="0" max="100" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如：66.67">
                             </div>
                              <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">儲存設定</button>
                         </form>
@@ -310,7 +328,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, onSnapshot, deleteDoc, updateDoc, writeBatch, getDocs, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, onSnapshot, deleteDoc, updateDoc, writeBatch, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -340,6 +358,7 @@
         let allResidentsForSelectedEvent = [];
         let unsubscribeResidents = () => {};
         let unsubscribeSettings = () => {};
+        let currentQuorumRatio = 0;
 
         // --- Firestore Paths ---
         const eventsCollectionPath = () => ["events"];
@@ -466,8 +485,6 @@
         // --- Event Management ---
         function listenToEvents() {
             const eventsList = document.getElementById('events-list');
-            // Removed orderBy from the query to avoid potential index-related permission issues.
-            // Sorting will be handled client-side.
             const q = query(collection(db, ...eventsCollectionPath()));
 
             onSnapshot(q, (snapshot) => {
@@ -482,7 +499,6 @@
                     eventsData.push({ id: doc.id, ...doc.data() });
                 });
 
-                // Sort events client-side by date, descending
                 eventsData.sort((a, b) => {
                     const dateA = a.eventDate ? new Date(a.eventDate).getTime() : 0;
                     const dateB = b.eventDate ? new Date(b.eventDate).getTime() : 0;
@@ -528,13 +544,16 @@
                     });
                     eventsList.appendChild(card);
                 });
+            }, error => {
+                console.error("Error listening to events collection:", error);
+                alert("無法讀取活動列表，請檢查您的網路連線或 Firebase 安全規則。");
             });
         }
         
         document.getElementById('events-list').addEventListener('click', async (e) => {
             const deleteButton = e.target.closest('.delete-event-card-btn');
             if (deleteButton) {
-                e.stopPropagation(); // Prevent card click event from firing
+                e.stopPropagation();
                 const eventId = deleteButton.dataset.id;
                 if (confirm('您確定要刪除這個活動嗎？此操作將一併刪除所有住戶資料，且無法復原！')) {
                     try {
@@ -554,7 +573,6 @@
 
         document.getElementById('create-event-btn').addEventListener('click', () => {
             createEventForm.reset();
-            // Set default value to now
             const now = new Date();
             now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
             document.getElementById('new-event-date').value = now.toISOString().slice(0,16);
@@ -576,6 +594,7 @@
                     communityName,
                     eventName,
                     eventDate,
+                    ownershipRatio: 66.67, // Default value
                     createdAt: serverTimestamp(),
                     creatorId: currentUser.uid,
                     creatorName: currentUser.name
@@ -627,8 +646,12 @@
                     document.getElementById('community-name').value = data.communityName || '';
                     document.getElementById('event-name').value = data.eventName || '';
                     document.getElementById('event-date').value = data.eventDate || '';
+                    document.getElementById('ownership-ratio').value = data.ownershipRatio || '';
+                    currentQuorumRatio = parseFloat(data.ownershipRatio) || 0;
+
                     document.getElementById('community-name-display').textContent = data.communityName || '請先設定社區名稱';
                     document.getElementById('event-title-display').textContent = data.eventName || 'QR Code 報到系統';
+                    updateDashboardCalculations();
                 }
             });
         }
@@ -642,6 +665,7 @@
                     communityName: document.getElementById('community-name').value,
                     eventName: document.getElementById('event-name').value,
                     eventDate: document.getElementById('event-date').value,
+                    ownershipRatio: document.getElementById('ownership-ratio').value,
                 });
                 alert('設定已儲存！');
             } catch (error) {
@@ -651,84 +675,159 @@
         });
         
         // --- Resident Management (Event Specific) ---
-        document.getElementById('add-resident-form').addEventListener('submit', async(e) => {
+        const addResidentForm = document.getElementById('add-resident-form');
+        const residentIdInput = document.getElementById('resident-id');
+        const residentUnitInput = document.getElementById('resident-unit');
+        const residentNameInput = document.getElementById('resident-name');
+        const residentOwnershipInput = document.getElementById('resident-ownership');
+        const addResidentBtn = document.getElementById('add-resident-btn');
+        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+        addResidentForm.addEventListener('submit', async(e) => {
             e.preventDefault();
             if (!selectedEventId) return;
-            const unit = document.getElementById('resident-unit').value;
-            const name = document.getElementById('resident-name').value;
+
+            const unit = residentUnitInput.value;
+            const name = residentNameInput.value;
+            const ownership = parseFloat(residentOwnershipInput.value) || 0;
+            const residentId = residentIdInput.value;
+
             try {
-                await addDoc(collection(db, ...residentsCollectionPath(selectedEventId)), {
-                    unit, name, isCheckedIn: false, checkInTimestamp: null,
-                });
-                document.getElementById('add-resident-form').reset();
+                if (residentId) {
+                    const residentRef = doc(db, ...residentDocPath(selectedEventId, residentId));
+                    await updateDoc(residentRef, { unit, name, ownership });
+                } else {
+                    await addDoc(collection(db, ...residentsCollectionPath(selectedEventId)), {
+                        unit, name, ownership, isCheckedIn: false, checkInTimestamp: null,
+                    });
+                }
+                resetResidentForm();
             } catch (error) {
-                console.error("Error adding resident:", error);
-                alert('新增住戶失敗！');
+                console.error("Error saving resident:", error);
+                alert('儲存住戶失敗！');
             }
         });
+
+        function resetResidentForm() {
+            addResidentForm.reset();
+            residentIdInput.value = '';
+            addResidentBtn.textContent = '新增住戶';
+            addResidentBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            addResidentBtn.classList.add('bg-red-600', 'hover:bg-red-700');
+            cancelEditBtn.classList.add('hidden');
+        }
+        cancelEditBtn.addEventListener('click', resetResidentForm);
 
         function listenToResidents(eventId) {
             const q = query(collection(db, ...residentsCollectionPath(eventId)));
             return onSnapshot(q, (querySnapshot) => {
-                const residentsList = document.getElementById('residents-list');
-                const recentCheckInsList = document.getElementById('recent-check-ins-list');
-                const scannerRecentList = document.getElementById('scanner-recent-list');
-                
-                residentsList.innerHTML = '';
+                const residentsListTbody = document.getElementById('residents-list');
+                residentsListTbody.innerHTML = '';
                 allResidentsForSelectedEvent = [];
                 querySnapshot.forEach((doc) => allResidentsForSelectedEvent.push({ id: doc.id, ...doc.data() }));
                 allResidentsForSelectedEvent.sort((a,b) => a.unit.localeCompare(b.unit, undefined, {numeric: true, sensitivity: 'base'}));
                 
-                let checkedInCount = 0;
-                let recentCheckIns = [];
-
                 allResidentsForSelectedEvent.forEach(resident => {
                     const tr = document.createElement('tr');
                     tr.innerHTML = `
                         <td class="px-4 py-2 whitespace-nowrap">${resident.unit}</td>
                         <td class="px-4 py-2 whitespace-nowrap">${resident.name}</td>
+                        <td class="px-4 py-2 whitespace-nowrap">${resident.ownership || 0}%</td>
                         <td class="px-4 py-2"><div id="qr-${resident.id}"></div></td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium"><button data-id="${resident.id}" class="delete-btn text-red-600 hover:text-red-900">刪除</button></td>
+                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">
+                            <button data-id="${resident.id}" class="edit-btn text-blue-600 hover:text-blue-900">編輯</button>
+                            <button data-id="${resident.id}" class="delete-btn text-red-600 hover:text-red-900 ml-2">刪除</button>
+                        </td>
                     `;
-                    residentsList.appendChild(tr);
+                    residentsListTbody.appendChild(tr);
                     new QRCode(document.getElementById(`qr-${resident.id}`), { text: resident.id, width: 64, height: 64 });
-                    if (resident.isCheckedIn) {
-                        checkedInCount++;
-                        recentCheckIns.push(resident);
-                    }
                 });
 
-                document.getElementById('total-residents').textContent = allResidentsForSelectedEvent.length;
-                document.getElementById('checked-in-count').textContent = checkedInCount;
-                document.getElementById('scanner-checked-in').textContent = checkedInCount;
-                document.getElementById('scanner-total').textContent = allResidentsForSelectedEvent.length;
-                const rate = allResidentsForSelectedEvent.length > 0 ? ((checkedInCount / allResidentsForSelectedEvent.length) * 100).toFixed(1) : 0;
-                document.getElementById('check-in-rate').textContent = `${rate}%`;
-                
-                recentCheckIns.sort((a, b) => b.checkInTimestamp - a.checkInTimestamp);
-                if (recentCheckIns.length > 0) {
-                    recentCheckInsList.innerHTML = '';
-                    scannerRecentList.innerHTML = '';
-                    recentCheckIns.slice(0, 10).forEach(r => {
-                         const time = r.checkInTimestamp ? new Date(r.checkInTimestamp.seconds * 1000).toLocaleTimeString('zh-TW') : 'N/A';
-                         recentCheckInsList.innerHTML += `<tr><td class="px-4 py-2">${r.unit}</td><td class="px-4 py-2">${r.name}</td><td class="px-4 py-2">${time}</td></tr>`;
-                         scannerRecentList.innerHTML += `<li class="p-2 bg-gray-100 rounded-md"><span class="font-bold">${r.unit} ${r.name}</span> - ${time}</li>`;
-                    });
-                } else {
-                     recentCheckInsList.innerHTML = `<tr><td colspan="3" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>`;
-                     scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">尚無報到紀錄</li>`;
-                }
                 if (allResidentsForSelectedEvent.length === 0) {
-                    residentsList.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">請新增住戶</td></tr>`;
+                    residentsListTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">請新增住戶</td></tr>`;
+                }
+
+                updateDashboardCalculations();
+            });
+        }
+
+        function updateDashboardCalculations() {
+            const recentCheckInsList = document.getElementById('recent-check-ins-list');
+            const scannerRecentList = document.getElementById('scanner-recent-list');
+            const quorumMessage = document.getElementById('quorum-message');
+
+            let checkedInCount = 0;
+            let recentCheckIns = [];
+            let totalOwnership = 0;
+            let checkedInOwnership = 0;
+
+            allResidentsForSelectedEvent.forEach(resident => {
+                const ownershipValue = parseFloat(resident.ownership) || 0;
+                totalOwnership += ownershipValue;
+                if (resident.isCheckedIn) {
+                    checkedInCount++;
+                    checkedInOwnership += ownershipValue;
+                    recentCheckIns.push(resident);
                 }
             });
+
+            document.getElementById('total-residents').textContent = allResidentsForSelectedEvent.length;
+            document.getElementById('checked-in-count').textContent = checkedInCount;
+            document.getElementById('scanner-checked-in').textContent = checkedInCount;
+            document.getElementById('scanner-total').textContent = allResidentsForSelectedEvent.length;
+
+            const personRate = allResidentsForSelectedEvent.length > 0 ? ((checkedInCount / allResidentsForSelectedEvent.length) * 100).toFixed(1) : 0;
+            document.getElementById('check-in-rate').textContent = `${personRate}%`;
+
+            // Using total possible ownership as 100% for calculation, not the sum of parts.
+            const ownershipRate = (checkedInOwnership).toFixed(2);
+            document.getElementById('ownership-check-in-rate').textContent = `${ownershipRate}%`;
+
+            if (currentQuorumRatio > 0 && ownershipRate >= currentQuorumRatio) {
+                quorumMessage.classList.remove('hidden');
+            } else {
+                quorumMessage.classList.add('hidden');
+            }
+            
+            recentCheckIns.sort((a, b) => (b.checkInTimestamp?.seconds || 0) - (a.checkInTimestamp?.seconds || 0));
+            if (recentCheckIns.length > 0) {
+                recentCheckInsList.innerHTML = '';
+                scannerRecentList.innerHTML = '';
+                const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                recentCheckIns.slice(0, 10).forEach(r => {
+                     const time = r.checkInTimestamp ? new Date(r.checkInTimestamp.seconds * 1000).toLocaleString('zh-TW', options).replace(/\//g, '-') : 'N/A';
+                     recentCheckInsList.innerHTML += `<tr><td class="px-4 py-2">${r.unit}</td><td class="px-4 py-2">${time}</td></tr>`;
+                     const simpleTime = r.checkInTimestamp ? new Date(r.checkInTimestamp.seconds * 1000).toLocaleTimeString('zh-TW') : 'N/A';
+                     scannerRecentList.innerHTML += `<li class="p-2 bg-gray-100 rounded-md"><span class="font-bold">${r.unit} ${r.name}</span> - ${simpleTime}</li>`;
+                });
+            } else {
+                 recentCheckInsList.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>`;
+                 scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">尚無報到紀錄</li>`;
+            }
         }
         
         document.getElementById('residents-list').addEventListener('click', async e => {
-            if (e.target.classList.contains('delete-btn')) {
-                const id = e.target.dataset.id;
+            const target = e.target;
+            if (target.classList.contains('delete-btn')) {
+                const id = target.dataset.id;
                 if (confirm('確定要刪除這位住戶嗎？')) {
                     await deleteDoc(doc(db, ...residentDocPath(selectedEventId, id)));
+                }
+            }
+            if (target.classList.contains('edit-btn')) {
+                const id = target.dataset.id;
+                const resident = allResidentsForSelectedEvent.find(r => r.id === id);
+                if (resident) {
+                    residentIdInput.value = resident.id;
+                    residentUnitInput.value = resident.unit;
+                    residentNameInput.value = resident.name;
+                    residentOwnershipInput.value = resident.ownership || 0;
+                    
+                    addResidentBtn.textContent = '更新資料';
+                    addResidentBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
+                    addResidentBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+                    cancelEditBtn.classList.remove('hidden');
+                    residentUnitInput.focus();
                 }
             }
         });
@@ -774,35 +873,15 @@
         }
         
         // --- Reset, Delete, and Print ---
-
-        // Helper function to delete an event and its 'residents' subcollection
         async function deleteEventAndSubcollection(eventId) {
             if (!eventId) return;
-
             const residentsColRef = collection(db, ...residentsCollectionPath(eventId));
             const residentsSnapshot = await getDocs(residentsColRef);
-
-            // Firestore batches are limited to 500 operations.
-            // Process deletions in chunks to handle large numbers of residents.
             if (!residentsSnapshot.empty) {
-                const batchSize = 500;
-                let commitPromises = [];
-                let batch = writeBatch(db);
-                let operationCount = 0;
-                
-                residentsSnapshot.docs.forEach((doc, index) => {
-                    batch.delete(doc.ref);
-                    operationCount++;
-                    if (operationCount === batchSize || index === residentsSnapshot.docs.length - 1) {
-                        commitPromises.push(batch.commit());
-                        batch = writeBatch(db);
-                        operationCount = 0;
-                    }
-                });
-                await Promise.all(commitPromises);
+                const batch = writeBatch(db);
+                residentsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                await batch.commit();
             }
-            
-            // Finally, delete the event document itself
             await deleteDoc(doc(db, ...eventDocPath(eventId)));
         }
 
