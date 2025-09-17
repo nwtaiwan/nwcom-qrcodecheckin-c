@@ -114,6 +114,17 @@
 </head>
 <body class="bg-red-600 text-gray-800 transition-colors duration-300">
 
+    <!-- Public View -->
+    <div id="public-dashboard-view" class="hidden max-w-7xl mx-auto p-4 md:p-6">
+         <header class="text-center mb-6 pb-4 border-b">
+             <h1 id="public-community-name-display" class="text-3xl font-bold text-red-700">載入中...</h1>
+             <p id="public-event-title-display" class="text-2xl text-gray-800 mt-1"></p>
+         </header>
+         <div id="public-dashboard-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+             <!-- Public dashboard cards will be injected here by JS -->
+         </div>
+    </div>
+
     <!-- App Container -->
     <div id="app" class="max-w-7xl mx-auto p-4 md:p-6">
 
@@ -193,51 +204,59 @@
             <!-- Tab Content -->
             <div id="tab-content">
                 <!-- Dashboard -->
-                <div id="dashboard-content" class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                     <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                         <div>
-                             <p class="text-sm font-medium text-gray-500">總住戶數</p>
-                             <p id="total-residents" class="text-3xl font-bold text-red-600">0</p>
-                         </div>
+                <div id="dashboard-content">
+                    <div class="flex justify-end mb-4">
+                        <button id="share-dashboard-btn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" /></svg>
+                            分享儀表板
+                        </button>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">已報到人數</p>
-                            <p id="checked-in-count" class="text-3xl font-bold text-green-600">0</p>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                        <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                             <div>
+                                 <p class="text-sm font-medium text-gray-500">總住戶數</p>
+                                 <p id="total-residents" class="text-3xl font-bold text-red-600">0</p>
+                             </div>
                         </div>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">人數報到率 <span id="person-ratio-target" class="text-xs"></span></p>
-                            <p id="check-in-rate" class="text-3xl font-bold text-orange-600">0%</p>
+                        <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">已報到人數</p>
+                                <p id="checked-in-count" class="text-3xl font-bold text-green-600">0</p>
+                            </div>
                         </div>
-                        <span id="quorum-person-message" class="hidden text-green-600 font-bold text-lg">已達法定開會人數</span>
-                    </div>
-                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                        <div>
-                            <p class="text-sm font-medium text-gray-500">區分權報到率 <span id="ownership-ratio-target" class="text-xs"></span></p>
-                            <p id="ownership-check-in-rate" class="text-3xl font-bold text-blue-600">0%</p>
+                        <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">人數報到率 <span id="person-ratio-target" class="text-xs"></span></p>
+                                <p id="check-in-rate" class="text-3xl font-bold text-orange-600">0%</p>
+                            </div>
+                            <span id="quorum-person-message" class="hidden text-green-600 font-bold text-lg">已達法定開會人數</span>
                         </div>
-                        <span id="quorum-message" class="hidden text-green-600 font-bold text-lg">已達法定開會區分權比例</span>
-                    </div>
-                    <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-md">
-                        <div class="flex justify-between items-center mb-4">
-                            <h3 class="text-lg font-semibold">最近報到紀錄</h3>
+                        <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                            <div>
+                                <p class="text-sm font-medium text-gray-500">區分權報到率 <span id="ownership-ratio-target" class="text-xs"></span></p>
+                                <p id="ownership-check-in-rate" class="text-3xl font-bold text-blue-600">0%</p>
+                            </div>
+                            <span id="quorum-message" class="hidden text-green-600 font-bold text-lg">已達法定開會區分權比例</span>
                         </div>
-                        <div class="overflow-x-auto">
-                            <table class="min-w-full">
-                                <thead class="bg-gray-50">
-                                    <tr>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到日期時間</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到方式</th>
-                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作員</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="recent-check-ins-list" class="bg-white divide-y divide-gray-200">
-                                    <tr><td colspan="4" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>
-                                </tbody>
-                            </table>
+                        <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-md">
+                            <div class="flex justify-between items-center mb-4">
+                                <h3 class="text-lg font-semibold">最近報到紀錄</h3>
+                            </div>
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到日期時間</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到方式</th>
+                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作員</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="recent-check-ins-list" class="bg-white divide-y divide-gray-200">
+                                        <tr><td colspan="4" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>
+                                    </tbody>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -426,6 +445,25 @@
             </form>
         </div>
     </div>
+    
+    <!-- Share Modal -->
+    <div id="share-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-20 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <div class="flex justify-between items-center mb-4">
+                 <h3 class="text-lg leading-6 font-medium text-gray-900">分享即時儀表板</h3>
+                 <button id="close-share-modal-btn" class="text-gray-400 hover:text-gray-600">
+                     <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                 </button>
+            </div>
+            <div class="mt-2 text-center">
+                <p class="text-sm text-gray-500 mb-4">掃描 QR code 或點擊下方連結以查看公開的即時報表。</p>
+                <a id="share-link" href="#" target="_blank">
+                    <div id="share-qr-code" class="flex justify-center p-4 border rounded-md"></div>
+                </a>
+                <p id="share-url-display" class="mt-4 text-xs text-gray-500 break-all"></p>
+            </div>
+        </div>
+    </div>
 
 
     <!-- Print Area -->
@@ -476,12 +514,25 @@
         const residentDocPath = (eventId, residentId) => ["events", eventId, "residents", residentId];
 
         // This listener ensures that the rest of the code runs only after the HTML document is fully loaded.
-        // This prevents "Cannot read properties of null" errors when trying to access elements.
         window.addEventListener('DOMContentLoaded', () => {
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const publicViewEventId = urlParams.get('event');
+            const isPublicView = urlParams.get('view') === 'public';
+
+            if (isPublicView && publicViewEventId) {
+                initializeAppPublic(publicViewEventId);
+            } else {
+                initializeAppPrivate();
+            }
+        });
+
+        function initializeAppPrivate() {
             // --- DOM Elements ---
             const loginView = document.getElementById('login-view');
             const eventSelectionView = document.getElementById('event-selection-view');
             const eventDetailsView = document.getElementById('event-details-view');
+            const appContainer = document.getElementById('app');
             const userDisplay = document.getElementById('user-display');
             const userDisplayDetails = document.getElementById('user-display-details');
             const usernameInput = document.getElementById('username');
@@ -491,7 +542,15 @@
             const scanGunForm = document.getElementById('scan-gun-form');
             const scanGunInput = document.getElementById('scan-gun-input');
             const loginForm = document.getElementById('login-form');
+            const shareDashboardBtn = document.getElementById('share-dashboard-btn');
+            const shareModal = document.getElementById('share-modal');
+            const closeShareModalBtn = document.getElementById('close-share-modal-btn');
+            const shareQrCodeContainer = document.getElementById('share-qr-code');
+            const shareLink = document.getElementById('share-link');
+            const shareUrlDisplay = document.getElementById('share-url-display');
             
+            appContainer.style.display = 'block';
+
             // --- UI Logic ---
             function setupUI() {
                 const eyeIcon = `<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>`;
@@ -742,7 +801,7 @@
                 if (tabKey !== 'scanner') stopScanner();
                 Object.keys(tabs).forEach(key => {
                     tabs[key].classList.toggle('active', key === tabKey);
-                    contents[key].classList.toggle('hidden', key !== tabKey);
+                    if(contents[key]) contents[key].classList.toggle('hidden', key !== tabKey);
                 });
                 if (tabKey === 'scanner') {
                     setTimeout(() => {
@@ -1228,8 +1287,7 @@
 
 
                 const numPages = Math.ceil(allResidentsForSelectedEvent.length / residentsPerPage);
-                printArea.style.setProperty('--page-count', numPages);
-
+                
 
                 for (let i = 0; i < numPages; i++) {
                     const start = i * residentsPerPage;
@@ -1447,8 +1505,96 @@
                     }
                 }
             });
-        });
+            
+            // --- Share Modal Logic ---
+            shareDashboardBtn.addEventListener('click', () => {
+                const url = `${window.location.origin}${window.location.pathname}?view=public&event=${selectedEventId}`;
+                shareQrCodeContainer.innerHTML = ''; // Clear previous QR Code
+                new QRCode(shareQrCodeContainer, {
+                    text: url,
+                    width: 256,
+                    height: 256,
+                });
+                shareLink.href = url;
+                shareUrlDisplay.textContent = url;
+                shareModal.classList.remove('hidden');
+            });
+
+            closeShareModalBtn.addEventListener('click', () => {
+                shareModal.classList.add('hidden');
+            });
+
+             shareModal.addEventListener('click', (e) => {
+                if (e.target === shareModal) {
+                    shareModal.classList.add('hidden');
+                }
+            });
+        }
+
+        function initializeAppPublic(eventId) {
+            document.body.classList.remove('bg-red-600');
+            document.body.classList.add('bg-gray-100');
+            
+            const appContainer = document.getElementById('app');
+            const publicView = document.getElementById('public-dashboard-view');
+            appContainer.style.display = 'none';
+            publicView.classList.remove('hidden');
+
+            const publicCommunityName = document.getElementById('public-community-name-display');
+            const publicEventTitle = document.getElementById('public-event-title-display');
+            const publicDashboardContent = document.getElementById('public-dashboard-content');
+
+            const eventRef = doc(db, ...eventDocPath(eventId));
+            onSnapshot(eventRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    publicCommunityName.textContent = data.communityName || '社群名稱';
+                    publicEventTitle.textContent = data.eventName || '活動報表';
+                    const residentsColRef = collection(db, ...residentsCollectionPath(eventId));
+                    onSnapshot(residentsColRef, (residentsSnapshot) => {
+                        const residents = [];
+                        residentsSnapshot.forEach(doc => residents.push(doc.data()));
+                        renderPublicDashboard(data, residents);
+                    });
+                } else {
+                    publicCommunityName.textContent = '找不到活動';
+                }
+            });
+
+            function renderPublicDashboard(eventData, residentsData) {
+                let checkedInCount = 0;
+                let checkedInOwnership = 0;
+
+                residentsData.forEach(r => {
+                    if (r.isCheckedIn) {
+                        checkedInCount++;
+                        checkedInOwnership += parseFloat(r.ownership) || 0;
+                    }
+                });
+                
+                const personRate = residentsData.length > 0 ? ((checkedInCount / residentsData.length) * 100).toFixed(1) : 0;
+                const ownershipRate = checkedInOwnership.toFixed(4);
+
+                publicDashboardContent.innerHTML = `
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <p class="text-sm font-medium text-gray-500">總住戶數</p>
+                        <p class="text-3xl font-bold text-red-600">${residentsData.length}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <p class="text-sm font-medium text-gray-500">已報到人數</p>
+                        <p class="text-3xl font-bold text-green-600">${checkedInCount}</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <p class="text-sm font-medium text-gray-500">人數報到率</p>
+                        <p class="text-3xl font-bold text-orange-600">${personRate}%</p>
+                    </div>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <p class="text-sm font-medium text-gray-500">區分權報到率</p>
+                        <p class="text-3xl font-bold text-blue-600">${ownershipRate}%</p>
+                    </div>
+                `;
+            }
+        }
     </script>
 </body>
 </html>
-
