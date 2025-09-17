@@ -159,10 +159,12 @@
                                     <tr>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
                                         <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到日期時間</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">報到方式</th>
+                                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作員</th>
                                     </tr>
                                 </thead>
                                 <tbody id="recent-check-ins-list" class="bg-white divide-y divide-gray-200">
-                                    <tr><td colspan="2" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>
+                                    <tr><td colspan="4" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -862,12 +864,26 @@
                 const options = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
                 recentCheckIns.slice(0, 10).forEach(r => {
                     const time = r.checkInTimestamp ? new Date(r.checkInTimestamp.seconds * 1000).toLocaleString('zh-TW', options).replace(/\//g, '-') : 'N/A';
-                    recentCheckInsList.innerHTML += `<tr><td class="px-4 py-2">${r.unit}</td><td class="px-4 py-2">${time}</td></tr>`;
+                    recentCheckInsList.innerHTML += `<tr>
+                        <td class="px-4 py-2">${r.unit}</td>
+                        <td class="px-4 py-2">${time}</td>
+                        <td class="px-4 py-2">${r.checkInMethod || 'N/A'}</td>
+                        <td class="px-4 py-2">${r.checkInBy || 'N/A'}</td>
+                    </tr>`;
+                    
                     const simpleTime = r.checkInTimestamp ? new Date(r.checkInTimestamp.seconds * 1000).toLocaleTimeString('zh-TW') : 'N/A';
-                    scannerRecentList.innerHTML += `<li class="p-2 bg-gray-100 rounded-md"><span class="font-bold">${r.unit} ${r.name}</span> - ${simpleTime}</li>`;
+                    const checkInInfo = r.checkInBy && r.checkInMethod 
+                        ? `<span class="text-sm text-gray-500 block">由 ${r.checkInBy} 透過 ${r.checkInMethod} 報到</span>`
+                        : '';
+                    scannerRecentList.innerHTML += `<li class="p-2 bg-gray-100 rounded-md">
+                        <div>
+                            <span class="font-bold">${r.unit} ${r.name}</span> - ${simpleTime}
+                        </div>
+                        ${checkInInfo}
+                    </li>`;
                 });
             } else {
-                 recentCheckInsList.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>`;
+                 recentCheckInsList.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>`;
                  scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">掃碼紀錄將顯示於此</li>`;
             }
         }
@@ -893,11 +909,11 @@
                     const residentRef = doc(db, ...residentDocPath(selectedEventId, residentId));
                     if (resident.isCheckedIn) {
                         if (confirm(`確定要取消 ${resident.unit} ${resident.name} 的報到嗎？`)) {
-                             await updateDoc(residentRef, { isCheckedIn: false, checkInTimestamp: null });
+                             await updateDoc(residentRef, { isCheckedIn: false, checkInTimestamp: null, checkInMethod: null, checkInBy: null });
                         }
                     } else {
                         if (confirm(`確定要為 ${resident.unit} ${resident.name} 手動報到嗎？`)) {
-                            await updateDoc(residentRef, { isCheckedIn: true, checkInTimestamp: new Date() });
+                            await updateDoc(residentRef, { isCheckedIn: true, checkInTimestamp: new Date(), checkInMethod: '手動', checkInBy: currentUser.name });
                         }
                     }
                 }
@@ -914,7 +930,7 @@
             e.preventDefault();
             const code = scanGunInput.value.trim();
             if (code) {
-                handleCheckIn(code);
+                handleCheckIn(code, '掃碼槍');
                 scanGunInput.value = '';
             }
         });
@@ -930,7 +946,7 @@
             const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 };
             
             readerPlaceholder.classList.add('hidden');
-            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleCheckIn(decodedText))
+            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleCheckIn(decodedText, '攝影機'))
                 .then(() => {
                     startScanBtn.disabled = true;
                     stopScanBtn.disabled = false;
@@ -959,7 +975,7 @@
         }
         
         let lastScanTime = 0, lastScannedId = null;
-        async function handleCheckIn(decodedText) {
+        async function handleCheckIn(decodedText, method) {
             const now = Date.now();
             if (now - lastScanTime < 3000 && lastScannedId === decodedText) return;
             lastScanTime = now;
@@ -980,7 +996,12 @@
                     scannerStatus.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-yellow-100 text-yellow-800';
                     speak("重複掃碼");
                 } else {
-                    await updateDoc(residentRef, { isCheckedIn: true, checkInTimestamp: new Date() });
+                    await updateDoc(residentRef, { 
+                        isCheckedIn: true, 
+                        checkInTimestamp: new Date(),
+                        checkInMethod: method,
+                        checkInBy: currentUser.name
+                    });
                     scannerStatus.textContent = `報到成功: ${resident.unit} ${resident.name}`;
                     scannerStatus.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-green-100 text-green-800';
                     speak("報到成功");
@@ -1012,7 +1033,7 @@
                 if(residentsToCheck.length > 0) {
                     residentsToCheck.forEach(resident => {
                         const residentRef = doc(db, ...residentDocPath(selectedEventId, resident.id));
-                        batch.update(residentRef, { isCheckedIn: false, checkInTimestamp: null });
+                        batch.update(residentRef, { isCheckedIn: false, checkInTimestamp: null, checkInMethod: null, checkInBy: null });
                     });
                     await batch.commit();
                     alert('所有報到紀錄已成功重設！');
