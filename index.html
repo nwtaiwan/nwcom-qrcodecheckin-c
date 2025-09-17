@@ -49,10 +49,24 @@
                 left: 0;
                 top: 0;
                 width: 100%;
+                counter-reset: page;
             }
 
             .print-page {
                 page-break-after: always;
+                position: relative;
+                min-height: 25cm; 
+            }
+            
+            .print-page::after {
+                content: '第 ' counter(page) ' 頁，共 ' var(--page-count) ' 頁';
+                counter-increment: page;
+                position: absolute;
+                bottom: -0.5cm;
+                left: 0;
+                right: 0;
+                text-align: center;
+                font-size: 10pt;
             }
 
             .print-page:last-child {
@@ -1146,7 +1160,22 @@
                 const eventName = document.getElementById('event-title-display').textContent;
                 const eventDateValue = document.getElementById('event-date').value;
                 const attendanceFee = document.getElementById('attendance-fee').value || '_____';
-                const formattedEventDate = eventDateValue ? new Date(eventDateValue).toLocaleString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+                
+                let formattedEventDate = '';
+                if (eventDateValue) {
+                    const eventDate = new Date(eventDateValue);
+                    const rocYear = eventDate.getFullYear() - 1911;
+                    const month = eventDate.getMonth() + 1;
+                    const day = eventDate.getDate();
+                    let hours = eventDate.getHours();
+                    const minutes = eventDate.getMinutes();
+                    const ampm = hours >= 12 ? '下午' : '上午';
+                    hours = hours % 12;
+                    hours = hours ? hours : 12; // the hour '0' should be '12'
+                    const formattedMinutes = minutes < 10 ? '0' + minutes : minutes;
+                    formattedEventDate = `會議時間 : ${rocYear}年${month}月${day}日 ${ampm} ${hours}:${formattedMinutes}`;
+                }
+
 
                 let printContent = '';
                 const residentsPerPage = 10;
@@ -1189,6 +1218,8 @@
 
 
                 const numPages = Math.ceil(allResidentsForSelectedEvent.length / residentsPerPage);
+                printArea.style.setProperty('--page-count', numPages);
+
 
                 for (let i = 0; i < numPages; i++) {
                     const start = i * residentsPerPage;
@@ -1214,12 +1245,12 @@
                                     <th style="width: 7%;">QR Code</th>
                                     <th style="width: 8%;">戶號</th>
                                     <th style="width: 10%;">姓名</th>
-                                    <th style="width: 22%;">地址</th>
-                                    <th style="width: 8%;">簽到</th>
+                                    <th style="width: 18%;">地址</th>
+                                    <th style="width: 10%;">簽到</th>
                                     <th style="width: 10%;">是否委<br>託出席</th>
-                                    <th style="width: 12%;">委託關係</th>
-                                    <th style="width: 12%;">出席費</th>
-                                    <th style="width: 7%;">簽退</th>
+                                    <th style="width: 14%;">委託關係</th>
+                                    <th style="width: 9%;">出席費</th>
+                                    <th style="width: 10%;">簽退</th>
                                 </tr>
                             </thead>
                             <tbody>
