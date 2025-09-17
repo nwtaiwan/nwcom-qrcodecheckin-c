@@ -1223,9 +1223,11 @@
                 }
 
                 printArea.innerHTML = printContent;
+                printArea.classList.remove('hidden');
                 
                 setTimeout(() => {
                     window.print();
+                    printArea.classList.add('hidden');
                 }, 500);
             });
 
