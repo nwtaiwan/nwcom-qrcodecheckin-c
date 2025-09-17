@@ -208,13 +208,14 @@
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">人數報到率</p>
+                            <p class="text-sm font-medium text-gray-500">人數報到率 <span id="person-ratio-target" class="text-xs"></span></p>
                             <p id="check-in-rate" class="text-3xl font-bold text-orange-600">0%</p>
                         </div>
+                        <span id="quorum-person-message" class="hidden text-green-600 font-bold text-lg">已達法定開會人數</span>
                     </div>
                     <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
                         <div>
-                            <p class="text-sm font-medium text-gray-500">區分權報到率</p>
+                            <p class="text-sm font-medium text-gray-500">區分權報到率 <span id="ownership-ratio-target" class="text-xs"></span></p>
                             <p id="ownership-check-in-rate" class="text-3xl font-bold text-blue-600">0%</p>
                         </div>
                         <span id="quorum-message" class="hidden text-green-600 font-bold text-lg">已達法定開會區分權比例人數</span>
@@ -327,6 +328,10 @@
                                  <label for="event-date" class="block text-sm font-medium text-gray-700">活動日期與時間</label>
                                  <input type="datetime-local" id="event-date" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
                              </div>
+                             <div class="mb-6">
+                                <label for="person-ratio" class="block text-sm font-medium text-gray-700">法定開會人數比例 (%)</label>
+                                <input type="number" id="person-ratio" step="1" min="0" max="100" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如：50">
+                            </div>
                             <div class="mb-6">
                                 <label for="ownership-ratio" class="block text-sm font-medium text-gray-700">法定開會區分權比例 (%)</label>
                                 <input type="number" id="ownership-ratio" step="0.01" min="0" max="100" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如：66.67">
@@ -462,6 +467,7 @@
         let unsubscribeResidents = () => {};
         let unsubscribeSettings = () => {};
         let currentQuorumRatio = 0;
+        let currentPersonQuorumRatio = 0;
 
         // --- Firestore Paths ---
         const eventsCollectionPath = () => ["events"];
@@ -757,8 +763,10 @@
                         document.getElementById('event-name').value = data.eventName || '';
                         document.getElementById('event-date').value = data.eventDate || '';
                         document.getElementById('ownership-ratio').value = data.ownershipRatio || '';
+                        document.getElementById('person-ratio').value = data.personRatio || '';
                         document.getElementById('attendance-fee').value = data.attendanceFee || '';
                         currentQuorumRatio = parseFloat(data.ownershipRatio) || 0;
+                        currentPersonQuorumRatio = parseFloat(data.personRatio) || 0;
 
                         document.getElementById('community-name-display').textContent = data.communityName || '請先設定社區名稱';
                         document.getElementById('event-title-display').textContent = data.eventName || 'QR Code 報到系統';
@@ -777,6 +785,7 @@
                         eventName: document.getElementById('event-name').value,
                         eventDate: document.getElementById('event-date').value,
                         ownershipRatio: document.getElementById('ownership-ratio').value,
+                        personRatio: document.getElementById('person-ratio').value,
                         attendanceFee: document.getElementById('attendance-fee').value,
                     });
                     alert('設定已儲存！');
@@ -902,6 +911,7 @@
                 const recentCheckInsList = document.getElementById('recent-check-ins-list');
                 const scannerRecentList = document.getElementById('scanner-recent-list');
                 const quorumMessage = document.getElementById('quorum-message');
+                const quorumPersonMessage = document.getElementById('quorum-person-message');
 
                 let checkedInCount = 0;
                 let recentCheckIns = [];
@@ -928,6 +938,16 @@
 
                 const ownershipRate = (checkedInOwnership).toFixed(4);
                 document.getElementById('ownership-check-in-rate').textContent = `${ownershipRate}%`;
+
+                document.getElementById('person-ratio-target').textContent = `(目標: ${currentPersonQuorumRatio}%)`;
+                document.getElementById('ownership-ratio-target').textContent = `(目標: ${currentQuorumRatio}%)`;
+
+
+                if (currentPersonQuorumRatio > 0 && personRate >= currentPersonQuorumRatio) {
+                    quorumPersonMessage.classList.remove('hidden');
+                } else {
+                    quorumPersonMessage.classList.add('hidden');
+                }
 
                 if (currentQuorumRatio > 0 && ownershipRate >= currentQuorumRatio) {
                     quorumMessage.classList.remove('hidden');
@@ -1267,7 +1287,7 @@
                                     <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>承租人</div>
                                 </td>
                                 <td style="text-align: left; font-size: 8pt; line-height: 1.3;">
-                                     <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>${attendanceFee}</div>
+                                     <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>${attendanceFee} 元</div>
                                 </td>
                                 <td></td>
                             </tr>
@@ -1290,7 +1310,7 @@
                     printContent += `
                             </tbody>
                         </table>
-                        <div style="text-align: center; margin-top: 1rem; font-size: 10pt;">
+                        <div class="print-footer" style="text-align: center; margin-top: 1rem; font-size: 10pt;">
                             <p>第 ${i + 1} 頁，共 ${numPages} 頁</p>
                             <p style="margin-top: 0.5rem;">西北保全&西北物業 製表</p>
                         </div>
