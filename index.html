@@ -49,24 +49,12 @@
                 left: 0;
                 top: 0;
                 width: 100%;
-                counter-reset: page;
             }
 
             .print-page {
                 page-break-after: always;
                 position: relative;
                 min-height: 25cm; 
-            }
-            
-            .print-page::after {
-                content: '第 ' counter(page) ' 頁，共 ' var(--page-count) ' 頁';
-                counter-increment: page;
-                position: absolute;
-                bottom: -0.5cm;
-                left: 0;
-                right: 0;
-                text-align: center;
-                font-size: 10pt;
             }
 
             .print-page:last-child {
@@ -1302,6 +1290,10 @@
                     printContent += `
                             </tbody>
                         </table>
+                        <div style="text-align: center; margin-top: 1rem; font-size: 10pt;">
+                            <p>第 ${i + 1} 頁，共 ${numPages} 頁</p>
+                            <p style="margin-top: 0.5rem;">西北保全&西北物業 製表</p>
+                        </div>
                     </div>`; 
                 }
 
