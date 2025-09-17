@@ -442,7 +442,6 @@
                 if (username === 'test' && error.code === 'auth/user-not-found') {
                     try {
                         await createUserWithEmailAndPassword(auth, 'test@qrsystem.app', '123456');
-                        alert('偵測到為首次使用，已為您建立並登入測試帳號。\n帳號: test\n密碼: 123456');
                     } catch (creationError) {
                          alert(`測試帳號建立失敗: ${creationError.message}`);
                     }
