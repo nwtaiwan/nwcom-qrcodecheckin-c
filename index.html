@@ -1156,6 +1156,38 @@
                     return;
                 }
                 
+                // Helper function to format address for printing
+                function formatAddressForPrint(address) {
+                    if (!address) return '<br><br>'; // Return empty lines to maintain height
+                    let addr = address.trim();
+                    const parts = {
+                        road: '',
+                        numbers: '',
+                        floor: ''
+                    };
+
+                    // 1. Extract floor part (e.g., "5樓之1", "8樓")
+                    const floorMatch = addr.match(/(.*?)(\d+樓.*)/);
+                    if (floorMatch) {
+                        addr = floorMatch[1].trim();
+                        parts.floor = floorMatch[2];
+                    }
+
+                    // 2. Extract road/street/section part
+                    const roadMatch = addr.match(/(.*?([路街段]))(.*)/);
+                    if (roadMatch) {
+                        parts.road = roadMatch[1];
+                        parts.numbers = roadMatch[3].trim();
+                    } else {
+                        // If no standard road name, assume the whole remaining part is for the numbers line
+                        parts.numbers = addr;
+                    }
+                    
+                    // Join and return as a multi-line string
+                    return `${parts.road}<br>${parts.numbers}<br>${parts.floor}`;
+                }
+
+
                 const numPages = Math.ceil(allResidentsForSelectedEvent.length / residentsPerPage);
 
                 for (let i = 0; i < numPages; i++) {
@@ -1181,13 +1213,12 @@
                                     <th style="width: 4%;">序號</th>
                                     <th style="width: 7%;">QR Code</th>
                                     <th style="width: 8%;">戶號</th>
-                                    <th style="width: 9%;">姓名</th>
-                                    <th style="width: 18%;">地址</th>
+                                    <th style="width: 10%;">姓名</th>
+                                    <th style="width: 22%;">地址</th>
                                     <th style="width: 8%;">簽到</th>
-                                    <th style="width: 10%;">是否委託出席</th>
+                                    <th style="width: 10%;">是否委<br>託出席</th>
                                     <th style="width: 12%;">委託關係</th>
-                                    <th style="width: 7%;">區分權比例</th>
-                                    <th style="width: 10%;">出席費</th>
+                                    <th style="width: 12%;">出席費</th>
                                     <th style="width: 7%;">簽退</th>
                                 </tr>
                             </thead>
@@ -1201,8 +1232,8 @@
                                 <td>${start + index + 1}</td>
                                 <td><div id="print-qr-${residentId}" style="width: 50px; height: 50px; margin: auto;"></div></td>
                                 <td>${resident.unit || ''}</td>
-                                <td>${resident.name || ''}</td>
-                                <td style="text-align: left;">${resident.address || ''}</td>
+                                <td style="word-break: break-all;">${resident.name || ''}</td>
+                                <td style="text-align: left; font-size: 8pt; line-height: 1.2;">${formatAddressForPrint(resident.address)}</td>
                                 <td></td>
                                 <td style="text-align: left; font-size: 8pt; line-height: 1.3;">
                                     <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>本人</div>
@@ -1214,7 +1245,6 @@
                                     <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>其他區分所有權人</div>
                                     <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>承租人</div>
                                 </td>
-                                <td>${resident.ownership || ''}%</td>
                                 <td style="text-align: left; font-size: 8pt; line-height: 1.3;">
                                      <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>${attendanceFee}</div>
                                 </td>
@@ -1229,7 +1259,7 @@
                             <tr>
                                 <td>${start + pageResidents.length + j + 1}</td>
                                 <td></td><td></td><td></td><td></td>
-                                <td></td><td></td><td></td><td></td><td></td>
+                                <td></td><td></td><td></td><td></td>
                                 <td></td>
                             </tr>
                             `;
