@@ -163,11 +163,11 @@
                             <p class="text-sm font-medium text-gray-500">區分權報到率</p>
                             <p id="ownership-check-in-rate" class="text-3xl font-bold text-blue-600">0%</p>
                         </div>
+                        <span id="quorum-message" class="hidden text-green-600 font-bold text-lg">已達法定開會區分權比例人數</span>
                     </div>
                     <div class="md:col-span-2 bg-white p-6 rounded-xl shadow-md">
                         <div class="flex justify-between items-center mb-4">
                             <h3 class="text-lg font-semibold">最近報到紀錄</h3>
-                            <span id="quorum-message" class="hidden text-green-600 font-bold">已達法定開會區分權比例人數</span>
                         </div>
                         <div class="overflow-x-auto">
                             <table class="min-w-full">
@@ -191,7 +191,7 @@
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
                             <h3 class="text-lg font-semibold">住戶列表</h3>
                             <div class="flex items-center gap-2 flex-wrap">
-                                <button id="add-resident-modal-btn" class="bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 text-sm font-semibold">新增住戶</button>
+                                <button id="add-resident-modal-btn" class="bg-orange-500 text-white px-3 py-2 rounded-md hover:bg-orange-600 text-sm font-semibold">新增住戶</button>
                                 <button id="export-csv-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">匯出CSV</button>
                                 <input type="file" id="import-csv-input" class="hidden" accept=".csv">
                                 <button id="import-csv-btn" class="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 text-sm font-semibold">匯入CSV</button>
