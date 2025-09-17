@@ -93,7 +93,7 @@
                 vertical-align: middle;
             }
             
-            .print-table td:nth-child(4) { /* Address column */
+            .print-table td:nth-child(5) { /* Address column */
                 text-align: left;
             }
 
@@ -102,7 +102,7 @@
             }
             
             .print-table td {
-                height: 3em; /* Give enough height for signatures */
+                height: 3.5em; 
             }
         }
 
@@ -327,6 +327,10 @@
                                 <label for="ownership-ratio" class="block text-sm font-medium text-gray-700">法定開會區分權比例 (%)</label>
                                 <input type="number" id="ownership-ratio" step="0.01" min="0" max="100" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如：66.67">
                             </div>
+                            <div class="mb-6">
+                                <label for="attendance-fee" class="block text-sm font-medium text-gray-700">出席費金額</label>
+                                <input type="number" id="attendance-fee" min="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如：500">
+                            </div>
                              <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">儲存設定</button>
                         </form>
                         <div class="mt-8 border-t pt-6">
@@ -461,7 +465,6 @@
         const residentsCollectionPath = (eventId) => ["events", eventId, "residents"];
         const residentDocPath = (eventId, residentId) => ["events", eventId, "residents", residentId];
 
-        // ** THE FIX **
         // This listener ensures that the rest of the code runs only after the HTML document is fully loaded.
         // This prevents "Cannot read properties of null" errors when trying to access elements.
         window.addEventListener('DOMContentLoaded', () => {
@@ -750,6 +753,7 @@
                         document.getElementById('event-name').value = data.eventName || '';
                         document.getElementById('event-date').value = data.eventDate || '';
                         document.getElementById('ownership-ratio').value = data.ownershipRatio || '';
+                        document.getElementById('attendance-fee').value = data.attendanceFee || '';
                         currentQuorumRatio = parseFloat(data.ownershipRatio) || 0;
 
                         document.getElementById('community-name-display').textContent = data.communityName || '請先設定社區名稱';
@@ -769,6 +773,7 @@
                         eventName: document.getElementById('event-name').value,
                         eventDate: document.getElementById('event-date').value,
                         ownershipRatio: document.getElementById('ownership-ratio').value,
+                        attendanceFee: document.getElementById('attendance-fee').value,
                     });
                     alert('設定已儲存！');
                 } catch (error) {
@@ -1140,6 +1145,7 @@
                 const communityName = document.getElementById('community-name-display').textContent;
                 const eventName = document.getElementById('event-title-display').textContent;
                 const eventDateValue = document.getElementById('event-date').value;
+                const attendanceFee = document.getElementById('attendance-fee').value || '_____';
                 const formattedEventDate = eventDateValue ? new Date(eventDateValue).toLocaleString('zh-TW', { year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
                 let printContent = '';
@@ -1173,32 +1179,45 @@
                             <thead>
                                 <tr>
                                     <th style="width: 4%;">序號</th>
+                                    <th style="width: 7%;">QR Code</th>
                                     <th style="width: 8%;">戶號</th>
-                                    <th style="width: 10%;">姓名</th>
-                                    <th style="width: 25%;">地址</th>
-                                    <th style="width: 10%;">簽到</th>
-                                    <th style="width: 8%;">是否委託出席</th>
-                                    <th style="width: 8%;">委託關係</th>
-                                    <th style="width: 8%;">區分權比例</th>
-                                    <th style="width: 8%;">出席費</th>
-                                    <th style="width: 11%;">簽退</th>
+                                    <th style="width: 9%;">姓名</th>
+                                    <th style="width: 18%;">地址</th>
+                                    <th style="width: 8%;">簽到</th>
+                                    <th style="width: 10%;">是否委託出席</th>
+                                    <th style="width: 12%;">委託關係</th>
+                                    <th style="width: 7%;">區分權比例</th>
+                                    <th style="width: 10%;">出席費</th>
+                                    <th style="width: 7%;">簽退</th>
                                 </tr>
                             </thead>
                             <tbody>
                     `;
 
                     pageResidents.forEach((resident, index) => {
+                        const residentId = resident.id;
                         printContent += `
                             <tr>
                                 <td>${start + index + 1}</td>
+                                <td><div id="print-qr-${residentId}" style="width: 50px; height: 50px; margin: auto;"></div></td>
                                 <td>${resident.unit || ''}</td>
                                 <td>${resident.name || ''}</td>
-                                <td>${resident.address || ''}</td>
+                                <td style="text-align: left;">${resident.address || ''}</td>
                                 <td></td>
-                                <td></td>
-                                <td></td>
+                                <td style="text-align: left; font-size: 9pt; line-height: 1.4;">
+                                    <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>本人</div>
+                                    <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>委託</div>
+                                </td>
+                                <td style="text-align: left; font-size: 9pt; line-height: 1.4;">
+                                    <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>配偶</div>
+                                    <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>有行為能力之直系血親</div>
+                                    <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>其他區分所有權人</div>
+                                    <div><span style="font-size: 1.2em; margin-right: 4px;">□</span>承租人</div>
+                                </td>
                                 <td>${resident.ownership || ''}%</td>
-                                <td></td>
+                                <td style="text-align: left; font-size: 9pt; line-height: 1.4;">
+                                     <div style="display: flex; align-items: center;"><span style="font-size: 1.2em; margin-right: 4px;">□</span>${attendanceFee}</div>
+                                </td>
                                 <td></td>
                             </tr>
                         `;
@@ -1211,6 +1230,7 @@
                                 <td>${start + pageResidents.length + j + 1}</td>
                                 <td></td><td></td><td></td><td></td>
                                 <td></td><td></td><td></td><td></td><td></td>
+                                <td></td>
                             </tr>
                             `;
                         }
@@ -1223,6 +1243,22 @@
                 }
 
                 printArea.innerHTML = printContent;
+                
+                // Render QR Codes after they are in the DOM
+                for (let i = 0; i < allResidentsForSelectedEvent.length; i++) {
+                    const resident = allResidentsForSelectedEvent[i];
+                    const qrElement = document.getElementById(`print-qr-${resident.id}`);
+                    if (qrElement) {
+                        const qrValue = resident.qrcodeValue || resident.id;
+                        new QRCode(qrElement, {
+                            text: qrValue,
+                            width: 50,
+                            height: 50,
+                            correctLevel: QRCode.CorrectLevel.H
+                        });
+                    }
+                }
+
                 printArea.classList.remove('hidden');
                 
                 setTimeout(() => {
