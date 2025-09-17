@@ -187,68 +187,35 @@
 
                 <!-- Resident Management -->
                 <div id="residents-content" class="hidden">
-                    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                        <div class="lg:col-span-1 bg-white p-6 rounded-xl shadow-md">
-                            <h3 class="text-lg font-semibold mb-4">新增/修改住戶</h3>
-                            <form id="add-resident-form">
-                                <input type="hidden" id="resident-id">
-                                <div class="mb-4">
-                                    <label for="resident-qrcode-value" class="block text-sm font-medium text-gray-700">QR Code 生成碼</label>
-                                    <input type="text" id="resident-qrcode-value" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="用於掃描的唯一碼">
-                                </div>
-                                <div class="mb-4">
-                                    <label for="resident-unit" class="block text-sm font-medium text-gray-700">戶號</label>
-                                    <input type="text" id="resident-unit" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: A-1201">
-                                </div>
-                                <div class="mb-4">
-                                    <label for="resident-name" class="block text-sm font-medium text-gray-700">姓名</label>
-                                    <input type="text" id="resident-name" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
-                                </div>
-                                <div class="mb-4">
-                                    <label for="resident-address" class="block text-sm font-medium text-gray-700">住址</label>
-                                    <input type="text" id="resident-address" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
-                                </div>
-                                <div class="mb-4">
-                                    <label for="resident-area" class="block text-sm font-medium text-gray-700">坪數</label>
-                                    <input type="number" id="resident-area" step="0.01" min="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
-                                </div>
-                                <div class="mb-4">
-                                    <label for="resident-ownership" class="block text-sm font-medium text-gray-700">區分權比例 (%)</label>
-                                    <input type="number" id="resident-ownership" step="0.0001" min="0" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: 0.8521">
-                                </div>
-                                <button type="submit" id="add-resident-btn" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">新增住戶</button>
-                                <button type="button" id="cancel-edit-btn" class="hidden w-full mt-2 bg-gray-500 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-600">取消編輯</button>
-                            </form>
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h3 class="text-lg font-semibold">住戶列表</h3>
+                            <div class="flex items-center gap-2 flex-wrap">
+                                <button id="add-resident-modal-btn" class="bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 text-sm font-semibold">新增住戶</button>
+                                <button id="export-csv-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">匯出CSV</button>
+                                <input type="file" id="import-csv-input" class="hidden" accept=".csv">
+                                <button id="import-csv-btn" class="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 text-sm font-semibold">匯入CSV</button>
+                                <button id="delete-all-residents-btn" class="bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 text-sm font-semibold">全部刪除</button>
+                                <button id="print-qrs-btn" class="bg-purple-500 text-white px-3 py-2 rounded-md hover:bg-purple-600 text-sm font-semibold">列印QR Code</button>
+                            </div>
                         </div>
-                        <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md">
-                            <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
-                                <h3 class="text-lg font-semibold">住戶列表</h3>
-                                <div class="flex items-center gap-2 flex-wrap">
-                                    <button id="export-csv-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">匯出CSV</button>
-                                    <input type="file" id="import-csv-input" class="hidden" accept=".csv">
-                                    <button id="import-csv-btn" class="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 text-sm font-semibold">匯入CSV</button>
-                                    <button id="delete-all-residents-btn" class="bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 text-sm font-semibold">全部刪除</button>
-                                    <button id="print-qrs-btn" class="bg-purple-500 text-white px-3 py-2 rounded-md hover:bg-purple-600 text-sm font-semibold">列印QR Code</button>
-                                </div>
-                            </div>
-                            <div class="overflow-auto max-h-[60vh]">
-                                <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50 sticky top-0">
-                                        <tr>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code碼</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">住址</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">坪數</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">區分權(%)</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
-                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody id="residents-list" class="bg-white divide-y divide-gray-200"></tbody>
-                                </table>
-                            </div>
+                        <div class="overflow-auto max-h-[70vh]">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50 sticky top-0">
+                                    <tr>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code碼</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">住址</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">坪數</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">區分權(%)</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
+                                        <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="residents-list" class="bg-white divide-y divide-gray-200"></tbody>
+                            </table>
                         </div>
                     </div>
                 </div>
@@ -258,7 +225,13 @@
                      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                         <div class="bg-white p-6 rounded-xl shadow-md">
                             <h3 class="text-lg font-semibold mb-4">QR Code 掃描器</h3>
-                            <div id="reader" class="w-full h-auto aspect-square"></div>
+                            <div class="flex gap-4 mb-4">
+                                <button id="start-scan-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 disabled:bg-gray-400">開始掃碼</button>
+                                <button id="stop-scan-btn" class="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-md hover:bg-red-600 disabled:bg-gray-400" disabled>停止掃碼</button>
+                            </div>
+                            <div id="reader" class="w-full h-auto aspect-square bg-gray-100 flex items-center justify-center">
+                                <p id="reader-placeholder" class="text-gray-500">請點擊 "開始掃碼"</p>
+                            </div>
                             <div id="scanner-status" class="mt-4 text-center font-semibold p-3 rounded-md">&nbsp;</div>
                         </div>
                         <div class="bg-white p-6 rounded-xl shadow-md">
@@ -270,7 +243,7 @@
                             </div>
                             <h4 class="font-semibold mb-2">最近報到：</h4>
                             <ul id="scanner-recent-list" class="space-y-2 max-h-80 overflow-y-auto">
-                                <li class="text-gray-500 text-center">將攝影機對準 QR Code 開始掃描</li>
+                                <li class="text-gray-500 text-center">掃碼紀錄將顯示於此</li>
                             </ul>
                         </div>
                     </div>
@@ -341,6 +314,46 @@
                     </button>
                 </div>
             </div>
+        </div>
+    </div>
+    
+    <!-- Add/Edit Resident Modal -->
+    <div id="resident-modal" class="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full hidden z-50">
+        <div class="relative top-10 mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+            <h3 id="resident-modal-title" class="text-lg leading-6 font-medium text-gray-900 mb-4"></h3>
+            <form id="add-resident-form">
+                <input type="hidden" id="resident-id">
+                <div class="grid grid-cols-1 gap-4">
+                    <div class="mb-4">
+                        <label for="resident-qrcode-value" class="block text-sm font-medium text-gray-700">QR Code 生成碼</label>
+                        <input type="text" id="resident-qrcode-value" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="用於掃描的唯一碼">
+                    </div>
+                    <div>
+                        <label for="resident-unit" class="block text-sm font-medium text-gray-700">戶號</label>
+                        <input type="text" id="resident-unit" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: A-1201">
+                    </div>
+                    <div>
+                        <label for="resident-name" class="block text-sm font-medium text-gray-700">姓名</label>
+                        <input type="text" id="resident-name" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                    </div>
+                    <div>
+                        <label for="resident-address" class="block text-sm font-medium text-gray-700">住址</label>
+                        <input type="text" id="resident-address" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                    </div>
+                    <div>
+                        <label for="resident-area" class="block text-sm font-medium text-gray-700">坪數</label>
+                        <input type="number" id="resident-area" step="0.01" min="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                    </div>
+                    <div>
+                        <label for="resident-ownership" class="block text-sm font-medium text-gray-700">區分權比例 (%)</label>
+                        <input type="number" id="resident-ownership" step="0.0001" min="0" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: 0.8521">
+                    </div>
+                </div>
+                 <div class="items-center px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                    <button type="submit" id="save-resident-btn" class="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none sm:ml-3 sm:w-auto sm:text-sm">儲存</button>
+                    <button type="button" id="cancel-resident-modal-btn" class="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none sm:mt-0 sm:w-auto sm:text-sm">取消</button>
+                </div>
+            </form>
         </div>
     </div>
 
@@ -656,7 +669,7 @@
                 tabs[key].classList.toggle('active', key === tabKey);
                 contents[key].classList.toggle('hidden', key !== tabKey);
             });
-            if (tabKey === 'scanner') startScanner();
+            // Scanner is now manually started
         }
         
         // --- Settings Management (Event Specific) ---
@@ -699,6 +712,8 @@
         });
         
         // --- Resident Management (Event Specific) ---
+        const residentModal = document.getElementById('resident-modal');
+        const residentModalTitle = document.getElementById('resident-modal-title');
         const addResidentForm = document.getElementById('add-resident-form');
         const residentIdInput = document.getElementById('resident-id');
         const residentQrcodeValueInput = document.getElementById('resident-qrcode-value');
@@ -707,8 +722,31 @@
         const residentAddressInput = document.getElementById('resident-address');
         const residentAreaInput = document.getElementById('resident-area');
         const residentOwnershipInput = document.getElementById('resident-ownership');
-        const addResidentBtn = document.getElementById('add-resident-btn');
-        const cancelEditBtn = document.getElementById('cancel-edit-btn');
+
+        function openResidentModal(resident = null) {
+            addResidentForm.reset();
+            if (resident) {
+                residentModalTitle.textContent = '編輯住戶';
+                residentIdInput.value = resident.id;
+                residentQrcodeValueInput.value = resident.qrcodeValue || '';
+                residentUnitInput.value = resident.unit;
+                residentNameInput.value = resident.name;
+                residentAddressInput.value = resident.address || '';
+                residentAreaInput.value = resident.area || 0;
+                residentOwnershipInput.value = resident.ownership || 0;
+            } else {
+                residentModalTitle.textContent = '新增住戶';
+                residentIdInput.value = '';
+            }
+            residentModal.classList.remove('hidden');
+        }
+
+        function closeResidentModal() {
+            residentModal.classList.add('hidden');
+        }
+
+        document.getElementById('add-resident-modal-btn').addEventListener('click', () => openResidentModal());
+        document.getElementById('cancel-resident-modal-btn').addEventListener('click', closeResidentModal);
 
         addResidentForm.addEventListener('submit', async(e) => {
             e.preventDefault();
@@ -721,6 +759,7 @@
             const area = parseFloat(residentAreaInput.value) || 0;
             const ownership = parseFloat(residentOwnershipInput.value) || 0;
             const residentId = residentIdInput.value;
+            const createdAt = Date.now();
 
             try {
                 if (residentId) {
@@ -728,25 +767,15 @@
                     await updateDoc(residentRef, { qrcodeValue, unit, name, address, area, ownership });
                 } else {
                     await addDoc(collection(db, ...residentsCollectionPath(selectedEventId)), {
-                        qrcodeValue, unit, name, address, area, ownership, isCheckedIn: false, checkInTimestamp: null,
+                        qrcodeValue, unit, name, address, area, ownership, isCheckedIn: false, checkInTimestamp: null, createdAt
                     });
                 }
-                resetResidentForm();
+                closeResidentModal();
             } catch (error) {
                 console.error("Error saving resident:", error);
                 alert('儲存住戶失敗！請確認QR Code生成碼是否唯一。');
             }
         });
-
-        function resetResidentForm() {
-            addResidentForm.reset();
-            residentIdInput.value = '';
-            addResidentBtn.textContent = '新增住戶';
-            addResidentBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
-            addResidentBtn.classList.add('bg-red-600', 'hover:bg-red-700');
-            cancelEditBtn.classList.add('hidden');
-        }
-        cancelEditBtn.addEventListener('click', resetResidentForm);
 
         function listenToResidents(eventId) {
             const q = query(collection(db, ...residentsCollectionPath(eventId)));
@@ -755,7 +784,9 @@
                 residentsListTbody.innerHTML = '';
                 allResidentsForSelectedEvent = [];
                 querySnapshot.forEach((doc) => allResidentsForSelectedEvent.push({ id: doc.id, ...doc.data() }));
-                allResidentsForSelectedEvent.sort((a,b) => a.unit.localeCompare(b.unit, undefined, {numeric: true, sensitivity: 'base'}));
+                
+                // Sort by creation time to respect CSV import order
+                allResidentsForSelectedEvent.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
                 
                 allResidentsForSelectedEvent.forEach(resident => {
                     const tr = document.createElement('tr');
@@ -842,7 +873,7 @@
                 });
             } else {
                  recentCheckInsList.innerHTML = `<tr><td colspan="2" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>`;
-                 scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">尚無報到紀錄</li>`;
+                 scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">掃碼紀錄將顯示於此</li>`;
             }
         }
         
@@ -858,19 +889,7 @@
             if (target.classList.contains('edit-btn')) {
                 const resident = allResidentsForSelectedEvent.find(r => r.id === residentId);
                 if (resident) {
-                    residentIdInput.value = resident.id;
-                    residentQrcodeValueInput.value = resident.qrcodeValue || '';
-                    residentUnitInput.value = resident.unit;
-                    residentNameInput.value = resident.name;
-                    residentAddressInput.value = resident.address || '';
-                    residentAreaInput.value = resident.area || 0;
-                    residentOwnershipInput.value = resident.ownership || 0;
-                    
-                    addResidentBtn.textContent = '更新資料';
-                    addResidentBtn.classList.remove('bg-red-600', 'hover:bg-red-700');
-                    addResidentBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
-                    cancelEditBtn.classList.remove('hidden');
-                    residentQrcodeValueInput.focus();
+                    openResidentModal(resident);
                 }
             }
             if (target.classList.contains('manual-checkin-btn')) {
@@ -892,18 +911,46 @@
         
         // --- QR Scanner ---
         let html5QrCode = null;
-        function startScanner() {
+        const startScanBtn = document.getElementById('start-scan-btn');
+        const stopScanBtn = document.getElementById('stop-scan-btn');
+        const readerPlaceholder = document.getElementById('reader-placeholder');
+
+        function speak(text) {
+          const utterance = new SpeechSynthesisUtterance(text);
+          utterance.lang = 'zh-TW';
+          speechSynthesis.speak(utterance);
+        }
+
+        startScanBtn.addEventListener('click', () => {
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
             const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            
+            readerPlaceholder.classList.add('hidden');
             html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleCheckIn(decodedText))
+                .then(() => {
+                    startScanBtn.disabled = true;
+                    stopScanBtn.disabled = false;
+                })
                 .catch(err => {
                     document.getElementById('scanner-status').textContent = '無法啟動攝影機。請確認權限。';
                     document.getElementById('scanner-status').className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    readerPlaceholder.classList.remove('hidden');
                 });
-        }
+        });
+
+        stopScanBtn.addEventListener('click', stopScanner);
+
         function stopScanner() {
             if (html5QrCode && html5QrCode.isScanning) {
-                html5QrCode.stop().catch(err => console.log("QR scanner stop failed.", err));
+                html5QrCode.stop()
+                    .then(() => {
+                        startScanBtn.disabled = false;
+                        stopScanBtn.disabled = true;
+                        readerPlaceholder.classList.remove('hidden');
+                        document.getElementById('scanner-status').innerHTML = '&nbsp;';
+                         document.getElementById('scanner-status').className = 'mt-4 text-center font-semibold p-3 rounded-md';
+                    })
+                    .catch(err => console.log("QR scanner stop failed.", err));
             }
         }
         
@@ -927,14 +974,17 @@
                 if (resident.isCheckedIn) {
                     scannerStatus.textContent = `重複報到: ${resident.unit} ${resident.name} 已於 ${new Date(resident.checkInTimestamp.seconds * 1000).toLocaleTimeString('zh-TW')} 報到。`;
                     scannerStatus.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-yellow-100 text-yellow-800';
+                    speak("重複掃碼");
                 } else {
                     await updateDoc(residentRef, { isCheckedIn: true, checkInTimestamp: new Date() });
                     scannerStatus.textContent = `報到成功: ${resident.unit} ${resident.name}`;
                     scannerStatus.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-green-100 text-green-800';
+                    speak("報到成功");
                 }
             } else {
                 scannerStatus.textContent = '無效的 QR Code，找不到對應的住戶資料。';
                 scannerStatus.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                speak("無效的QR code");
             }
         }
         
@@ -1074,6 +1124,7 @@
                 if (!confirm(`即將匯入 ${rows.length - 1} 筆資料，這將會新增至現有列表，確定嗎？`)) return;
 
                 const batch = writeBatch(db);
+                const importTimestamp = Date.now();
                 for (let i = 1; i < rows.length; i++) {
                     const values = rows[i].trim().split(',').map(v => v.replace(/"/g, ''));
                     let residentData = {};
@@ -1091,6 +1142,7 @@
                         ownership: parseFloat(residentData.ownership) || 0,
                         isCheckedIn: false,
                         checkInTimestamp: null,
+                        createdAt: importTimestamp + i
                     });
                 }
 
