@@ -97,14 +97,16 @@
             .print-table {
                 width: 100%;
                 border-collapse: collapse;
-                font-size: 9pt; /* Reduced font size */
+                font-size: 9pt; 
+                table-layout: fixed; /* Fix table layout */
             }
 
             .print-table th, .print-table td {
                 border: 1px solid black;
-                padding: 4px; /* Reduced padding */
+                padding: 4px;
                 text-align: center;
                 vertical-align: middle;
+                word-wrap: break-word; /* Allow text to wrap */
             }
             
             .print-table td:nth-child(5) { /* Address column */
@@ -116,7 +118,7 @@
             }
             
             .print-table td {
-                height: 3em; /* Reduced height */
+                height: 3em; 
             }
         }
 
@@ -1241,16 +1243,16 @@
                         <table class="print-table">
                             <thead>
                                 <tr>
-                                    <th style="width: 4%;">序號</th>
-                                    <th style="width: 7%;">QR Code</th>
-                                    <th style="width: 8%;">戶號</th>
-                                    <th style="width: 10%;">姓名</th>
-                                    <th style="width: 18%;">地址</th>
-                                    <th style="width: 10%;">簽到</th>
-                                    <th style="width: 10%;">是否委<br>託出席</th>
-                                    <th style="width: 14%;">委託關係</th>
-                                    <th style="width: 9%;">出席費</th>
-                                    <th style="width: 10%;">簽退</th>
+                                    <th style="width: 0.8cm;">序號</th>
+                                    <th style="width: 1.8cm;">QR Code</th>
+                                    <th style="width: 1.8cm;">戶號</th>
+                                    <th style="width: 2cm;">姓名</th>
+                                    <th style="width: 2cm;">地址</th>
+                                    <th style="width: 2cm;">簽到</th>
+                                    <th style="width: 1.8cm;">是否委<br>託出席</th>
+                                    <th style="width: 3cm;">委託關係</th>
+                                    <th style="width: 1.8cm;">出席費</th>
+                                    <th style="width: 2cm;">簽退</th>
                                 </tr>
                             </thead>
                             <tbody>
