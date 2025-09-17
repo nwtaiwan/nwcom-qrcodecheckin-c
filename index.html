@@ -1572,25 +1572,41 @@
                     }
                 });
                 
-                const personRate = residentsData.length > 0 ? ((checkedInCount / residentsData.length) * 100).toFixed(1) : 0;
-                const ownershipRate = checkedInOwnership.toFixed(4);
+                const personRate = residentsData.length > 0 ? parseFloat(((checkedInCount / residentsData.length) * 100).toFixed(1)) : 0;
+                const ownershipRate = parseFloat(checkedInOwnership.toFixed(4));
+                
+                const personQuorumRatio = parseFloat(eventData.personRatio) || 0;
+                const ownershipQuorumRatio = parseFloat(eventData.ownershipRatio) || 0;
+
+                const personQuorumReached = personQuorumRatio > 0 && personRate >= personQuorumRatio;
+                const ownershipQuorumReached = ownershipQuorumRatio > 0 && ownershipRate >= ownershipQuorumRatio;
 
                 publicDashboardContent.innerHTML = `
-                    <div class="bg-white p-6 rounded-xl shadow-md">
-                        <p class="text-sm font-medium text-gray-500">總住戶數</p>
-                        <p class="text-3xl font-bold text-red-600">${residentsData.length}</p>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                         <div>
+                             <p class="text-sm font-medium text-gray-500">總住戶數</p>
+                             <p class="text-3xl font-bold text-red-600">${residentsData.length}</p>
+                         </div>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-md">
-                        <p class="text-sm font-medium text-gray-500">已報到人數</p>
-                        <p class="text-3xl font-bold text-green-600">${checkedInCount}</p>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">已報到人數</p>
+                            <p class="text-3xl font-bold text-green-600">${checkedInCount}</p>
+                        </div>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-md">
-                        <p class="text-sm font-medium text-gray-500">人數報到率</p>
-                        <p class="text-3xl font-bold text-orange-600">${personRate}%</p>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">人數報到率 <span class="text-xs">(目標: ${personQuorumRatio}%)</span></p>
+                            <p class="text-3xl font-bold text-orange-600">${personRate}%</p>
+                        </div>
+                        <span class="${personQuorumReached ? '' : 'hidden'} text-green-600 font-bold text-lg">已達法定開會人數</span>
                     </div>
-                    <div class="bg-white p-6 rounded-xl shadow-md">
-                        <p class="text-sm font-medium text-gray-500">區分權報到率</p>
-                        <p class="text-3xl font-bold text-blue-600">${ownershipRate}%</p>
+                    <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium text-gray-500">區分權報到率 <span class="text-xs">(目標: ${ownershipQuorumRatio}%)</span></p>
+                            <p class="text-3xl font-bold text-blue-600">${ownershipRate}%</p>
+                        </div>
+                        <span class="${ownershipQuorumReached ? '' : 'hidden'} text-green-600 font-bold text-lg">已達法定開會區分權比例</span>
                     </div>
                 `;
             }
