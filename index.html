@@ -37,6 +37,9 @@
                 page-break-inside: avoid;
             }
         }
+        .checked-in-row {
+            background-color: #f0fdf4; /* green-50 */
+        }
     </style>
 </head>
 <body class="bg-red-600 text-gray-800 transition-colors duration-300">
@@ -190,35 +193,52 @@
                             <form id="add-resident-form">
                                 <input type="hidden" id="resident-id">
                                 <div class="mb-4">
-                                    <label for="resident-unit" class="block text-sm font-medium text-gray-700">戶號 (例如: A-1201)</label>
-                                    <input type="text" id="resident-unit" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                    <label for="resident-unit" class="block text-sm font-medium text-gray-700">戶號</label>
+                                    <input type="text" id="resident-unit" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: A-1201">
                                 </div>
                                 <div class="mb-4">
                                     <label for="resident-name" class="block text-sm font-medium text-gray-700">姓名</label>
                                     <input type="text" id="resident-name" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
                                 </div>
                                 <div class="mb-4">
+                                    <label for="resident-address" class="block text-sm font-medium text-gray-700">住址</label>
+                                    <input type="text" id="resident-address" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                </div>
+                                <div class="mb-4">
+                                    <label for="resident-area" class="block text-sm font-medium text-gray-700">坪數</label>
+                                    <input type="number" id="resident-area" step="0.01" min="0" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                </div>
+                                <div class="mb-4">
                                     <label for="resident-ownership" class="block text-sm font-medium text-gray-700">區分權比例 (%)</label>
-                                    <input type="number" id="resident-ownership" step="0.01" min="0" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: 0.85">
+                                    <input type="number" id="resident-ownership" step="0.0001" min="0" required class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500" placeholder="例如: 0.8521">
                                 </div>
                                 <button type="submit" id="add-resident-btn" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">新增住戶</button>
                                 <button type="button" id="cancel-edit-btn" class="hidden w-full mt-2 bg-gray-500 text-white font-bold py-2 px-4 rounded-md hover:bg-gray-600">取消編輯</button>
                             </form>
                         </div>
                         <div class="lg:col-span-2 bg-white p-6 rounded-xl shadow-md">
-                            <div class="flex justify-between items-center mb-4">
+                            <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
                                 <h3 class="text-lg font-semibold">住戶列表</h3>
-                                <button id="print-qrs-btn" class="bg-green-500 text-white px-4 py-2 rounded-md hover:bg-green-600 text-sm font-semibold">列印所有 QR Code</button>
+                                <div class="flex items-center gap-2">
+                                    <button id="export-csv-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">匯出CSV</button>
+                                    <input type="file" id="import-csv-input" class="hidden" accept=".csv">
+                                    <button id="import-csv-btn" class="bg-green-500 text-white px-3 py-2 rounded-md hover:bg-green-600 text-sm font-semibold">匯入CSV</button>
+                                    <button id="delete-all-residents-btn" class="bg-red-600 text-white px-3 py-2 rounded-md hover:bg-red-700 text-sm font-semibold">全部刪除</button>
+                                    <button id="print-qrs-btn" class="bg-purple-500 text-white px-3 py-2 rounded-md hover:bg-purple-600 text-sm font-semibold">列印QR Code</button>
+                                </div>
                             </div>
                             <div class="overflow-auto max-h-[60vh]">
                                 <table class="min-w-full divide-y divide-gray-200">
-                                    <thead class="bg-gray-50">
+                                    <thead class="bg-gray-50 sticky top-0">
                                         <tr>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">區分權比例</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
-                                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">狀態</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">戶號</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">姓名</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">住址</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">坪數</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">區分權(%)</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">QR Code</th>
+                                            <th class="px-2 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                                         </tr>
                                     </thead>
                                     <tbody id="residents-list" class="bg-white divide-y divide-gray-200"></tbody>
@@ -679,6 +699,8 @@
         const residentIdInput = document.getElementById('resident-id');
         const residentUnitInput = document.getElementById('resident-unit');
         const residentNameInput = document.getElementById('resident-name');
+        const residentAddressInput = document.getElementById('resident-address');
+        const residentAreaInput = document.getElementById('resident-area');
         const residentOwnershipInput = document.getElementById('resident-ownership');
         const addResidentBtn = document.getElementById('add-resident-btn');
         const cancelEditBtn = document.getElementById('cancel-edit-btn');
@@ -689,16 +711,18 @@
 
             const unit = residentUnitInput.value;
             const name = residentNameInput.value;
+            const address = residentAddressInput.value;
+            const area = parseFloat(residentAreaInput.value) || 0;
             const ownership = parseFloat(residentOwnershipInput.value) || 0;
             const residentId = residentIdInput.value;
 
             try {
                 if (residentId) {
                     const residentRef = doc(db, ...residentDocPath(selectedEventId, residentId));
-                    await updateDoc(residentRef, { unit, name, ownership });
+                    await updateDoc(residentRef, { unit, name, address, area, ownership });
                 } else {
                     await addDoc(collection(db, ...residentsCollectionPath(selectedEventId)), {
-                        unit, name, ownership, isCheckedIn: false, checkInTimestamp: null,
+                        unit, name, address, area, ownership, isCheckedIn: false, checkInTimestamp: null,
                     });
                 }
                 resetResidentForm();
@@ -729,22 +753,31 @@
                 
                 allResidentsForSelectedEvent.forEach(resident => {
                     const tr = document.createElement('tr');
+                    tr.className = resident.isCheckedIn ? 'checked-in-row' : '';
+                    
+                    const manualCheckinBtnClass = resident.isCheckedIn ? 'bg-green-500 hover:bg-green-600' : 'bg-gray-400 hover:bg-gray-500';
+                    const manualCheckinBtnText = resident.isCheckedIn ? '取消報到' : '手動報到';
+
                     tr.innerHTML = `
-                        <td class="px-4 py-2 whitespace-nowrap">${resident.unit}</td>
-                        <td class="px-4 py-2 whitespace-nowrap">${resident.name}</td>
-                        <td class="px-4 py-2 whitespace-nowrap">${resident.ownership || 0}%</td>
-                        <td class="px-4 py-2"><div id="qr-${resident.id}"></div></td>
-                        <td class="px-4 py-2 whitespace-nowrap text-sm font-medium">
-                            <button data-id="${resident.id}" class="edit-btn text-blue-600 hover:text-blue-900">編輯</button>
+                        <td class="px-2 py-2 whitespace-nowrap text-center"><span class="inline-block h-4 w-4 rounded-full ${resident.isCheckedIn ? 'bg-green-500' : 'bg-gray-300'}"></span></td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.unit}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.name}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.address || ''}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.area || 0}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.ownership || 0}%</td>
+                        <td class="px-2 py-2"><div id="qr-${resident.id}" class="mx-auto"></div></td>
+                        <td class="px-2 py-2 whitespace-nowrap text-sm font-medium">
+                            <button data-id="${resident.id}" class="manual-checkin-btn text-white text-xs py-1 px-2 rounded ${manualCheckinBtnClass}">${manualCheckinBtnText}</button>
+                            <button data-id="${resident.id}" class="edit-btn text-blue-600 hover:text-blue-900 ml-2">編輯</button>
                             <button data-id="${resident.id}" class="delete-btn text-red-600 hover:text-red-900 ml-2">刪除</button>
                         </td>
                     `;
                     residentsListTbody.appendChild(tr);
-                    new QRCode(document.getElementById(`qr-${resident.id}`), { text: resident.id, width: 64, height: 64 });
+                    new QRCode(document.getElementById(`qr-${resident.id}`), { text: resident.id, width: 48, height: 48 });
                 });
 
                 if (allResidentsForSelectedEvent.length === 0) {
-                    residentsListTbody.innerHTML = `<tr><td colspan="5" class="p-4 text-center text-gray-500">請新增住戶</td></tr>`;
+                    residentsListTbody.innerHTML = `<tr><td colspan="8" class="p-4 text-center text-gray-500">請新增住戶</td></tr>`;
                 }
 
                 updateDashboardCalculations();
@@ -779,8 +812,7 @@
             const personRate = allResidentsForSelectedEvent.length > 0 ? ((checkedInCount / allResidentsForSelectedEvent.length) * 100).toFixed(1) : 0;
             document.getElementById('check-in-rate').textContent = `${personRate}%`;
 
-            // Using total possible ownership as 100% for calculation, not the sum of parts.
-            const ownershipRate = (checkedInOwnership).toFixed(2);
+            const ownershipRate = (checkedInOwnership).toFixed(4);
             document.getElementById('ownership-check-in-rate').textContent = `${ownershipRate}%`;
 
             if (currentQuorumRatio > 0 && ownershipRate >= currentQuorumRatio) {
@@ -808,19 +840,21 @@
         
         document.getElementById('residents-list').addEventListener('click', async e => {
             const target = e.target;
+            const residentId = target.dataset.id;
+            
             if (target.classList.contains('delete-btn')) {
-                const id = target.dataset.id;
                 if (confirm('確定要刪除這位住戶嗎？')) {
-                    await deleteDoc(doc(db, ...residentDocPath(selectedEventId, id)));
+                    await deleteDoc(doc(db, ...residentDocPath(selectedEventId, residentId)));
                 }
             }
             if (target.classList.contains('edit-btn')) {
-                const id = target.dataset.id;
-                const resident = allResidentsForSelectedEvent.find(r => r.id === id);
+                const resident = allResidentsForSelectedEvent.find(r => r.id === residentId);
                 if (resident) {
                     residentIdInput.value = resident.id;
                     residentUnitInput.value = resident.unit;
                     residentNameInput.value = resident.name;
+                    residentAddressInput.value = resident.address || '';
+                    residentAreaInput.value = resident.area || 0;
                     residentOwnershipInput.value = resident.ownership || 0;
                     
                     addResidentBtn.textContent = '更新資料';
@@ -830,20 +864,38 @@
                     residentUnitInput.focus();
                 }
             }
+            if (target.classList.contains('manual-checkin-btn')) {
+                const resident = allResidentsForSelectedEvent.find(r => r.id === residentId);
+                if(resident) {
+                    const residentRef = doc(db, ...residentDocPath(selectedEventId, residentId));
+                    if (resident.isCheckedIn) {
+                        if (confirm(`確定要取消 ${resident.unit} ${resident.name} 的報到嗎？`)) {
+                             await updateDoc(residentRef, { isCheckedIn: false, checkInTimestamp: null });
+                        }
+                    } else {
+                        if (confirm(`確定要為 ${resident.unit} ${resident.name} 手動報到嗎？`)) {
+                            await updateDoc(residentRef, { isCheckedIn: true, checkInTimestamp: new Date() });
+                        }
+                    }
+                }
+            }
         });
         
         // --- QR Scanner ---
         let html5QrCode = null;
         function startScanner() {
             if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-            html5QrCode.start({ facingMode: "environment" }, { fps: 10, qrbox: { width: 250, height: 250 } }, (decodedText) => handleCheckIn(decodedText))
+            const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleCheckIn(decodedText))
                 .catch(err => {
                     document.getElementById('scanner-status').textContent = '無法啟動攝影機。請確認權限。';
                     document.getElementById('scanner-status').className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
                 });
         }
         function stopScanner() {
-            if (html5QrCode && html5QrCode.isScanning) html5QrCode.stop();
+            if (html5QrCode && html5QrCode.isScanning) {
+                html5QrCode.stop().catch(err => console.log("QR scanner stop failed.", err));
+            }
         }
         
         let lastScanTime = 0, lastScannedId = null;
@@ -888,10 +940,17 @@
         document.getElementById('reset-checkin-btn').addEventListener('click', async () => {
              if (confirm('您確定要重設此活動所有住戶的報到紀錄嗎？此操作無法復原！')) {
                 const batch = writeBatch(db);
-                const querySnapshot = await getDocs(query(collection(db, ...residentsCollectionPath(selectedEventId))));
-                querySnapshot.forEach((doc) => batch.update(doc.ref, { isCheckedIn: false, checkInTimestamp: null }));
-                await batch.commit();
-                alert('所有報到紀錄已成功重設！');
+                const residentsToCheck = allResidentsForSelectedEvent.filter(r => r.isCheckedIn);
+                if(residentsToCheck.length > 0) {
+                    residentsToCheck.forEach(resident => {
+                        const residentRef = doc(db, ...residentDocPath(selectedEventId, resident.id));
+                        batch.update(residentRef, { isCheckedIn: false, checkInTimestamp: null });
+                    });
+                    await batch.commit();
+                    alert('所有報到紀錄已成功重設！');
+                } else {
+                    alert('目前沒有任何報到紀錄可重設。');
+                }
             }
         });
 
@@ -938,6 +997,108 @@
             });
             printArea.innerHTML += `</div>`;
             window.print();
+        });
+
+        // --- CSV and Mass Delete ---
+        document.getElementById('export-csv-btn').addEventListener('click', () => {
+            if (allResidentsForSelectedEvent.length === 0) {
+                alert('沒有住戶資料可匯出。');
+                return;
+            }
+            const headers = ['unit', 'name', 'address', 'area', 'ownership'];
+            let csvContent = "data:text/csv;charset=utf-8," + headers.join(',') + '\n';
+            
+            allResidentsForSelectedEvent.forEach(resident => {
+                const row = headers.map(header => `"${resident[header] || ''}"`);
+                csvContent += row.join(',') + '\n';
+            });
+
+            const encodedUri = encodeURI(csvContent);
+            const link = document.createElement("a");
+            link.setAttribute("href", encodedUri);
+            const communityName = document.getElementById('community-name-display').textContent.trim();
+            const eventName = document.getElementById('event-title-display').textContent.trim();
+            link.setAttribute("download", `${communityName}_${eventName}_住戶列表.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        });
+
+        const importCsvInput = document.getElementById('import-csv-input');
+        document.getElementById('import-csv-btn').addEventListener('click', () => importCsvInput.click());
+        importCsvInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                const text = e.target.result;
+                const rows = text.split('\n').filter(row => row.trim() !== '');
+                if (rows.length < 2) {
+                    alert('CSV檔案格式不符或沒有資料。');
+                    return;
+                }
+
+                const headers = rows[0].trim().split(',').map(h => h.replace(/"/g, ''));
+                const requiredHeaders = ['unit', 'name', 'ownership'];
+                if (!requiredHeaders.every(h => headers.includes(h))) {
+                    alert(`CSV標頭缺少必要欄位。必須包含: ${requiredHeaders.join(', ')}`);
+                    return;
+                }
+
+                if (!confirm(`即將匯入 ${rows.length - 1} 筆資料，這將會新增至現有列表，確定嗎？`)) return;
+
+                const batch = writeBatch(db);
+                for (let i = 1; i < rows.length; i++) {
+                    const values = rows[i].trim().split(',').map(v => v.replace(/"/g, ''));
+                    let residentData = {};
+                    headers.forEach((header, index) => {
+                        residentData[header] = values[index] || '';
+                    });
+
+                    const newResidentRef = doc(collection(db, ...residentsCollectionPath(selectedEventId)));
+                    batch.set(newResidentRef, {
+                        unit: residentData.unit || '',
+                        name: residentData.name || '',
+                        address: residentData.address || '',
+                        area: parseFloat(residentData.area) || 0,
+                        ownership: parseFloat(residentData.ownership) || 0,
+                        isCheckedIn: false,
+                        checkInTimestamp: null,
+                    });
+                }
+
+                try {
+                    await batch.commit();
+                    alert(`成功匯入 ${rows.length - 1} 筆住戶資料！`);
+                } catch (error) {
+                    console.error("CSV import failed: ", error);
+                    alert("匯入失敗，請檢查CSV檔案格式與內容。");
+                }
+            };
+            reader.readAsText(file);
+            importCsvInput.value = ''; // Reset input
+        });
+
+        document.getElementById('delete-all-residents-btn').addEventListener('click', async () => {
+            if (allResidentsForSelectedEvent.length === 0) {
+                alert('沒有住戶資料可刪除。');
+                return;
+            }
+            if(confirm(`您確定要刪除此活動的全部 ${allResidentsForSelectedEvent.length} 筆住戶資料嗎？此操作無法復原！`)) {
+                const batch = writeBatch(db);
+                allResidentsForSelectedEvent.forEach(resident => {
+                    const residentRef = doc(db, ...residentDocPath(selectedEventId, resident.id));
+                    batch.delete(residentRef);
+                });
+                try {
+                    await batch.commit();
+                    alert('已成功刪除所有住戶。');
+                } catch (error) {
+                    console.error("Delete all residents failed: ", error);
+                    alert("刪除失敗，請再試一次。");
+                }
+            }
         });
 
     </script>
