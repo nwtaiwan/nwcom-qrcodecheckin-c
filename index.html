@@ -203,9 +203,10 @@
             <!-- Tabs -->
             <div class="mb-6 border-b border-gray-200">
                 <nav class="flex flex-nowrap space-x-4 w-full overflow-x-auto" aria-label="Tabs">
-                    <button id="tab-dashboard" class="tab-button active shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">儀表板</button>
+                    <button id="tab-dashboard" class="tab-button active shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">報到儀表板</button>
                     <button id="tab-residents" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">住戶管理</button>
                     <button id="tab-scanner" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">掃碼報到</button>
+                     <button id="tab-votedashboard" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">投票儀表板</button>
                     <button id="tab-topicvote" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">議題投票</button>
                     <button id="tab-scanvote" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">掃碼投票</button>
                     <button id="tab-settings" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">系統設定</button>
@@ -342,6 +343,29 @@
                              </ul>
                          </div>
                      </div>
+                </div>
+
+                <!-- Vote Dashboard -->
+                <div id="votedashboard-content" class="hidden">
+                    <div class="bg-white p-6 rounded-xl shadow-md">
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h3 class="text-lg font-semibold">投票儀表板</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-500">投票總數</p>
+                                    <p id="total-votes" class="text-3xl font-bold text-red-600">0</p>
+                                </div>
+                            </div>
+                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
+                                <div>
+                                    <p class="text-sm font-medium text-gray-500">最近投票</p>
+                                    <p class="text-gray-400 text-sm">即將提供</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
                 </div>
 
                 <!-- Topic Vote -->
@@ -653,21 +677,24 @@
         let selectedEventId = null;
         let allResidentsForSelectedEvent = [];
         let unsubscribeResidents = () => {};
-        let unsubscribeSettings = () => {};
-        let unsubscribeUsers = () => {};
-        let unsubscribeSession = () => {};
-        let currentQuorumRatio = 0;
-        let currentPersonQuorumRatio = 0;
-        let currentResidentsPerPage = 10;
-        let currentTopics = [];
+let unsubscribeSettings = () => {};
+let unsubscribeUsers = () => {};
+let unsubscribeSession = () => {};
+let currentQuorumRatio = 0;
+let currentPersonQuorumRatio = 0;
+let currentResidentsPerPage = 10;
+let currentTopics = [];
+let unsubscribeTopics = () => {};
 
         // --- Firestore Paths ---
         const eventsCollectionPath = () => ["events"];
-        const eventDocPath = (eventId) => ["events", eventId];
-        const residentsCollectionPath = (eventId) => ["events", eventId, "residents"];
-        const residentDocPath = (eventId, residentId) => ["events", eventId, "residents", residentId];
-        const usersCollectionPath = () => ["users"];
-        const userDocPath = (userId) => ["users", userId];
+const eventDocPath = (eventId) => ["events", eventId];
+const residentsCollectionPath = (eventId) => ["events", eventId, "residents"];
+const residentDocPath = (eventId, residentId) => ["events", eventId, "residents", residentId];
+const topicsCollectionPath = (eventId) => ["events", eventId, "topics"];
+const topicDocPath = (eventId, topicId) => ["events", eventId, "topics", topicId];
+const usersCollectionPath = () => ["users"];
+const userDocPath = (userId) => ["users", userId];
 
         // This listener ensures that the rest of the code runs only after the HTML document is fully loaded.
         window.addEventListener('DOMContentLoaded', () => {
@@ -932,6 +959,7 @@
                 const tabScanner = document.getElementById('tab-scanner');
                 const tabTopicVote = document.getElementById('tab-topicvote');
                 const tabScanVote = document.getElementById('tab-scanvote');
+                const tabVoteDashboard = document.getElementById('tab-votedashboard');
                 const tabSettings = document.getElementById('tab-settings');
                 
                 // Set all to a baseline (Staff)
@@ -943,6 +971,7 @@
                 // Dashboard, Scanner and Voting tabs are always visible for logged-in users
                 tabDashboard.style.display = 'block';
                 tabScanner.style.display = 'block';
+                tabVoteDashboard.style.display = 'block';
                 tabTopicVote.style.display = 'block';
                 tabScanVote.style.display = 'block';
                 
@@ -1152,12 +1181,15 @@
                 unsubscribeResidents();
                 unsubscribeResidents = listenToResidents(eventId);
                 
+                unsubscribeTopics();
+                unsubscribeTopics = listenToTopics(eventId);
+                
                 switchTab('dashboard');
             }
 
             // --- Tabs Navigation ---
-            const tabs = { dashboard: document.getElementById('tab-dashboard'), residents: document.getElementById('tab-residents'), scanner: document.getElementById('tab-scanner'), topicvote: document.getElementById('tab-topicvote'), scanvote: document.getElementById('tab-scanvote'), settings: document.getElementById('tab-settings') };
-            const contents = { dashboard: document.getElementById('dashboard-content'), residents: document.getElementById('residents-content'), scanner: document.getElementById('scanner-content'), topicvote: document.getElementById('topicvote-content'), scanvote: document.getElementById('scanvote-content'), settings: document.getElementById('settings-content')};
+            const tabs = { dashboard: document.getElementById('tab-dashboard'), residents: document.getElementById('tab-residents'), scanner: document.getElementById('tab-scanner'), votedashboard: document.getElementById('tab-votedashboard'), topicvote: document.getElementById('tab-topicvote'), scanvote: document.getElementById('tab-scanvote'), settings: document.getElementById('tab-settings') };
+            const contents = { dashboard: document.getElementById('dashboard-content'), residents: document.getElementById('residents-content'), scanner: document.getElementById('scanner-content'), votedashboard: document.getElementById('votedashboard-content'), topicvote: document.getElementById('topicvote-content'), scanvote: document.getElementById('scanvote-content'), settings: document.getElementById('settings-content')};
             
             Object.keys(tabs).forEach(key => {
                 tabs[key].addEventListener('click', () => switchTab(key));
@@ -1165,12 +1197,28 @@
 
             // Topic vote actions
             addTopicBtn.addEventListener('click', async () => {
+                if (!selectedEventId) return;
                 const newTopic = await showTopicForm();
                 if (!newTopic) return;
-                newTopic.id = `T${currentTopics.length + 1}`;
-                currentTopics.push(newTopic);
-                renderTopicsMetaList();
-                renderTopicsTable();
+                showLoader();
+                try {
+                    await addDoc(collection(db, ...topicsCollectionPath(selectedEventId)), {
+                        title: newTopic.title,
+                        description: newTopic.description,
+                        proposer: newTopic.proposer,
+                        options: newTopic.options,
+                        multiSelect: newTopic.multiSelect,
+                        maxSelections: newTopic.maxSelections,
+                        createdAt: serverTimestamp(),
+                        createdBy: currentUser.uid,
+                        createdByName: currentUser.name
+                    });
+                } catch (error) {
+                    console.error("Error adding topic:", error);
+                    showCustomAlert('新增議題失敗，請稍後再試。');
+                } finally {
+                    hideLoader();
+                }
             });
             printTopicsBtn.addEventListener('click', () => {
                 window.print();
@@ -1647,6 +1695,22 @@
                     renderTopicsTable();
 
                     updateDashboardCalculations();
+                });
+            }
+
+            function listenToTopics(eventId) {
+                const q = query(collection(db, ...topicsCollectionPath(eventId)));
+                return onSnapshot(q, (querySnapshot) => {
+                    currentTopics = [];
+                    querySnapshot.forEach((doc) => currentTopics.push({ id: doc.id, ...doc.data() }));
+                    // Sort by createdAt for consistent order across users
+                    currentTopics.sort((a, b) => {
+                        const aTs = a.createdAt && typeof a.createdAt === 'object' && 'seconds' in a.createdAt ? a.createdAt.seconds : (a.createdAt || 0);
+                        const bTs = b.createdAt && typeof b.createdAt === 'object' && 'seconds' in b.createdAt ? b.createdAt.seconds : (b.createdAt || 0);
+                        return aTs - bTs;
+                    });
+                    renderTopicsMetaList();
+                    renderTopicsTable();
                 });
             }
 
