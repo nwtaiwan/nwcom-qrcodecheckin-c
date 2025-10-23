@@ -1200,7 +1200,7 @@
 
             function renderTopicsTable() {
                 const fixedHead = ['狀態','序號','戶號','姓名','坪數','區分權(%)'];
-                const topicHeads = currentTopics.map((t, i) => `議題${i+1}QR Code`);
+                const topicHeads = currentTopics.map((t, i) => `議題${i+1}投票`);
                 const headHtml = `
                     <tr>
                         ${fixedHead.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
@@ -1216,8 +1216,7 @@
                     const tr = document.createElement('tr');
                     tr.className = resident.isCheckedIn ? 'checked-in-row' : '';
                     const statusBadge = resident.isCheckedIn ? '✔️' : '❌';
-                    const baseQr = resident.qrcodeValue || resident.id || String(idx+1);
-                    const topicCells = currentTopics.map((t, tIdx) => `<td class="px-4 py-2"><div id="topicqr-${resident.id}-${tIdx}" class="mx-auto"></div></td>`).join('');
+                    const topicCells = currentTopics.map((t, tIdx) => `<td class="px-4 py-2 text-center"><button class="topic-vote-btn bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded" data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button></td>`).join('');
                     tr.innerHTML = `
                         <td class="px-2 py-2 whitespace-nowrap text-center">${statusBadge}</td>
                         <td class="px-2 py-2 whitespace-nowrap text-center">${idx + 1}</td>
@@ -1232,10 +1231,11 @@
                     `;
                     topicsTableBody.appendChild(tr);
                     currentTopics.forEach((t, tIdx) => {
-                        const el = document.getElementById(`topicqr-${resident.id}-${tIdx}`);
-                        if (el) {
-                            const text = `${baseQr}|T${tIdx+1}`;
-                            new QRCode(el, { text, width: 48, height: 48 });
+                        const btn = tr.querySelector(`.topic-vote-btn[data-topic-index="${tIdx}"]`);
+                        if (btn) {
+                            btn.addEventListener('click', () => {
+                                showTopicVoteModal(resident, t, tIdx, idx);
+                            });
                         }
                     });
                 });
@@ -1432,6 +1432,49 @@
                 });
             }
             
+            function padNumber(num, size) { return String(num).padStart(size, '0'); }
+            function getOptionCode(idx) {
+                const map = ['T','F','N','A','B','C','D','E','G','H'];
+                if (idx < map.length) return map[idx];
+                return String.fromCharCode('I'.charCodeAt(0) + (idx - map.length));
+            }
+            function buildVoteCode(residentSerial, topicSerial, optionIndex) {
+                return `A${padNumber(residentSerial,3)}M${padNumber(topicSerial,2)}${getOptionCode(optionIndex)}`;
+            }
+
+            function showTopicVoteModal(resident, topic, topicIdx, residentIdx) {
+                const proposerText = topic?.proposer?.type === 'resident' ? `住戶(${topic?.proposer?.unit || ''})` : '管委會';
+                const options = Array.isArray(topic.options) ? topic.options : [];
+
+                modalTitle.textContent = `議題${topicIdx + 1}`;
+                modalMessage.innerHTML = `
+                    <div class="space-y-3">
+                        <div><span class="font-semibold">主題：</span>${topic.title || ''}</div>
+                        <div><span class="font-semibold">說明：</span>${topic.description || '-'}</div>
+                        <div><span class="font-semibold">提案人：</span>${proposerText}</div>
+                        <div><span class="font-semibold">投票項目：</span></div>
+                        <div id="vote-options-qrs" class="grid grid-cols-2 sm:grid-cols-3 gap-3"></div>
+                    </div>
+                `;
+                modalButtons.innerHTML = `
+                    <button id="modal-close-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none">關閉</button>
+                `;
+                customModal.classList.remove('hidden');
+                document.getElementById('modal-close-btn').onclick = () => { customModal.classList.add('hidden'); };
+
+                const container = document.getElementById('vote-options-qrs');
+                options.forEach((opt, optIdx) => {
+                    const code = buildVoteCode(residentIdx + 1, topicIdx + 1, optIdx);
+                    const wrap = document.createElement('div');
+                    wrap.className = 'flex flex-col items-center';
+                    const qrId = `voteqr-${residentIdx}-${topicIdx}-${optIdx}`;
+                    wrap.innerHTML = `<div id="${qrId}"></div><div class="text-xs mt-1 text-gray-600">${opt.label}（代碼：${code}）</div>`;
+                    container.appendChild(wrap);
+                    const el = document.getElementById(qrId);
+                    if (el) new QRCode(el, { text: code, width: 96, height: 96 });
+                });
+            }
+
             // --- Settings Management (Event Specific) ---
             const settingsForm = document.getElementById('settings-form');
             
