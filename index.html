@@ -11,6 +11,7 @@
     <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
     <style>
         body { font-family: 'Inter', 'Noto Sans TC', sans-serif; }
+        .tab-button { min-width: 120px; }
         .tab-button.active {
             border-color: #dc2626; /* red-600 */
             color: #dc2626; /* red-600 */
@@ -201,7 +202,7 @@
 
             <!-- Tabs -->
             <div class="mb-6 border-b border-gray-200">
-                <nav class="flex space-x-4" aria-label="Tabs">
+                <nav class="flex flex-nowrap space-x-4 w-full overflow-x-auto" aria-label="Tabs">
                     <button id="tab-dashboard" class="tab-button active shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">儀表板</button>
                     <button id="tab-residents" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">住戶管理</button>
                     <button id="tab-scanner" class="tab-button shrink-0 px-4 py-2 text-sm font-medium text-gray-500 rounded-t-lg border-b-2 border-transparent hover:text-gray-700 hover:border-gray-300">掃碼報到</button>
