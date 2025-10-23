@@ -354,6 +354,10 @@
                                  <button id="print-topics-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">列印</button>
                              </div>
                          </div>
+                         <div class="mb-4">
+                             <h4 class="font-semibold">議題設定</h4>
+                             <div id="topics-meta-list" class="mt-2 border rounded-md"></div>
+                         </div>
                          <div class="overflow-auto max-h-[70vh]">
                              <table class="min-w-full divide-y divide-gray-200" style="table-layout: fixed;">
                                  <thead class="bg-gray-50 sticky top-0" id="topics-table-head"></thead>
@@ -713,6 +717,7 @@
             const printTopicsBtn = document.getElementById('print-topics-btn');
             const topicsTableHead = document.getElementById('topics-table-head');
             const topicsTableBody = document.getElementById('topics-table-body');
+            const topicsMetaList = document.getElementById('topics-meta-list');
             
             // Custom Print Modal Elements
             const customPrintModal = document.getElementById('custom-print-modal');
@@ -1160,9 +1165,11 @@
 
             // Topic vote actions
             addTopicBtn.addEventListener('click', async () => {
-                const topicName = await showCustomPrompt('請輸入議題名稱');
-                if (!topicName) return;
-                currentTopics.push({ name: topicName });
+                const newTopic = await showTopicForm();
+                if (!newTopic) return;
+                newTopic.id = `T${currentTopics.length + 1}`;
+                currentTopics.push(newTopic);
+                renderTopicsMetaList();
                 renderTopicsTable();
             });
             printTopicsBtn.addEventListener('click', () => {
@@ -1186,6 +1193,7 @@
                     }, 100); 
                 }
                 if (tabKey === 'topicvote') {
+                    renderTopicsMetaList();
                     renderTopicsTable();
                 }
             }
@@ -1244,6 +1252,184 @@
                         </tr>
                     `;
                 }
+            }
+
+            function renderTopicsMetaList() {
+                const container = document.getElementById('topics-meta-list');
+                if (!container) return;
+                if (!Array.isArray(currentTopics) || currentTopics.length === 0) {
+                    container.innerHTML = '<div class="text-gray-500 text-sm p-3">尚未新增議題</div>';
+                    return;
+                }
+                const heads = ['主題','說明','提案人','投票項目','複選(票數)'];
+                let html = '<table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>' +
+                    heads.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('') +
+                    '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
+                currentTopics.forEach(t => {
+                    const proposerText = t?.proposer?.type === 'resident' ? `住戶(${t?.proposer?.unit || ''})` : '管委會';
+                    const optionsText = Array.isArray(t.options) ? t.options.map(o => o.label).join('、') : '';
+                    const multiText = t.multiSelect ? `是(${t.maxSelections || 1})` : '否(1)';
+                    html += `
+                        <tr>
+                            <td class="px-2 py-2 whitespace-nowrap truncate">${t.title || ''}</td>
+                            <td class="px-2 py-2 whitespace-nowrap truncate">${t.description || ''}</td>
+                            <td class="px-2 py-2 whitespace-nowrap">${proposerText}</td>
+                            <td class="px-2 py-2 whitespace-nowrap truncate">${optionsText}</td>
+                            <td class="px-2 py-2 whitespace-nowrap">${multiText}</td>
+                        </tr>
+                    `;
+                });
+                html += '</tbody></table>';
+                container.innerHTML = html;
+            }
+
+            async function showTopicForm(initial = null) {
+                const defaults = {
+                    title: '',
+                    description: '',
+                    proposer: { type: 'committee', unit: '' },
+                    options: [{label:'同意'},{label:'不同意'},{label:'棄票'}],
+                    multiSelect: false,
+                    maxSelections: 1
+                };
+                const data = Object.assign({}, defaults, initial || {});
+
+                const units = Array.from(new Set((allResidentsForSelectedEvent || []).map(r => r.unit).filter(u => !!u)));
+                const unitOptionsHtml = units.map(u => `<option value="${u}">${u}</option>`).join('');
+
+                modalTitle.textContent = initial ? '編輯議題' : '新增議題';
+                modalMessage.innerHTML = `
+                    <div class="space-y-3">
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">主題</label>
+                            <input id="topic-title" type="text" value="${data.title}" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500" />
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">說明</label>
+                            <textarea id="topic-desc" rows="3" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500">${data.description || ''}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">提案人</label>
+                            <div class="flex items-center gap-4">
+                                <label class="flex items-center gap-2"><input type="radio" name="topic-proposer-type" value="committee" ${data.proposer?.type !== 'resident' ? 'checked' : ''}/> 管委會</label>
+                                <label class="flex items-center gap-2"><input type="radio" name="topic-proposer-type" value="resident" ${data.proposer?.type === 'resident' ? 'checked' : ''}/> 住戶</label>
+                                <select id="topic-proposer-unit" class="px-2 py-1 border rounded-md ${data.proposer?.type === 'resident' ? '' : 'hidden'}">
+                                    <option value="">請選擇戶號</option>
+                                    ${unitOptionsHtml}
+                                </select>
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm text-gray-700 mb-1">投票項目</label>
+                            <div id="topic-options-container" class="flex flex-wrap gap-2">
+                            </div>
+                            <div class="flex items-center gap-2 mt-2">
+                                <input id="new-option-input" type="text" placeholder="輸入選項..." class="px-2 py-1 border rounded-md flex-1" />
+                                <button id="add-option-btn" type="button" class="px-3 py-1 bg-gray-200 rounded-md hover:bg-gray-300 text-sm">新增選項</button>
+                            </div>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <label class="flex items-center gap-2"><input id="topic-multi" type="checkbox" ${data.multiSelect ? 'checked' : ''}/> 複選功能(設定票數)</label>
+                            <input id="topic-max" type="number" min="1" value="${data.maxSelections || 1}" class="px-2 py-1 border rounded-md w-24 ${data.multiSelect ? '' : 'opacity-50'}" ${data.multiSelect ? '' : 'disabled'} />
+                        </div>
+                    </div>
+                `;
+                modalButtons.innerHTML = `
+                    <button id="modal-ok-btn" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-red-700 focus:outline-none">確定</button>
+                    <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none">取消</button>
+                `;
+                customModal.classList.remove('hidden');
+
+                const options = Array.isArray(data.options) ? data.options.map(o => ({label: o.label})) : [];
+                const optionsContainer = document.getElementById('topic-options-container');
+                function renderOptionsChips() {
+                    if (!optionsContainer) return;
+                    if (options.length === 0) {
+                        optionsContainer.innerHTML = '<span class="text-gray-500 text-sm">尚無選項</span>';
+                        return;
+                    }
+                    optionsContainer.innerHTML = options.map((o, idx) => `
+                        <span class="inline-flex items-center gap-2 bg-gray-100 text-gray-800 text-sm px-2 py-1 rounded">
+                            ${o.label}
+                            <button data-idx="${idx}" class="remove-option text-red-600">×</button>
+                        </span>
+                    `).join('');
+                    Array.from(optionsContainer.querySelectorAll('.remove-option')).forEach(btn => {
+                        btn.addEventListener('click', () => {
+                            const i = parseInt(btn.getAttribute('data-idx'), 10);
+                            options.splice(i, 1);
+                            renderOptionsChips();
+                        });
+                    });
+                }
+                renderOptionsChips();
+
+                const proposerRadios = Array.from(document.querySelectorAll('input[name="topic-proposer-type"]'));
+                const proposerUnitSelect = document.getElementById('topic-proposer-unit');
+                proposerUnitSelect.value = data.proposer?.unit || '';
+                proposerRadios.forEach(r => r.addEventListener('change', () => {
+                    const isResident = r.value === 'resident' && r.checked;
+                    if (isResident) {
+                        proposerUnitSelect.classList.remove('hidden');
+                    } else {
+                        proposerUnitSelect.classList.add('hidden');
+                        proposerUnitSelect.value = '';
+                    }
+                }));
+
+                const multiCheckbox = document.getElementById('topic-multi');
+                const maxInput = document.getElementById('topic-max');
+                multiCheckbox.addEventListener('change', () => {
+                    if (multiCheckbox.checked) {
+                        maxInput.removeAttribute('disabled');
+                        maxInput.classList.remove('opacity-50');
+                        if (!maxInput.value || parseInt(maxInput.value, 10) < 1) maxInput.value = 2;
+                    } else {
+                        maxInput.setAttribute('disabled', 'true');
+                        maxInput.classList.add('opacity-50');
+                        maxInput.value = 1;
+                    }
+                });
+
+                const addOptionBtn = document.getElementById('add-option-btn');
+                const newOptionInput = document.getElementById('new-option-input');
+                addOptionBtn.addEventListener('click', () => {
+                    const label = (newOptionInput.value || '').trim();
+                    if (!label) return;
+                    if (options.some(o => o.label === label)) return;
+                    options.push({label});
+                    newOptionInput.value = '';
+                    renderOptionsChips();
+                });
+
+                return new Promise((resolve) => {
+                    document.getElementById('modal-ok-btn').onclick = () => {
+                        const title = document.getElementById('topic-title').value.trim();
+                        const description = document.getElementById('topic-desc').value.trim();
+                        const type = (document.querySelector('input[name="topic-proposer-type"]:checked')?.value) || 'committee';
+                        const unit = proposerUnitSelect.classList.contains('hidden') ? '' : (proposerUnitSelect.value || '');
+                        const multiSelect = multiCheckbox.checked;
+                        const maxSelections = parseInt(maxInput.value, 10) || 1;
+                        if (!title) {
+                            // 基本驗證：主題必填
+                            alert('請輸入主題');
+                            return;
+                        }
+                        customModal.classList.add('hidden');
+                        resolve({
+                            title,
+                            description,
+                            proposer: { type, unit },
+                            options,
+                            multiSelect,
+                            maxSelections
+                        });
+                    };
+                    document.getElementById('modal-cancel-btn').onclick = () => {
+                        customModal.classList.add('hidden');
+                        resolve(null);
+                    };
+                });
             }
             
             // --- Settings Management (Event Specific) ---
