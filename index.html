@@ -345,12 +345,23 @@
                 </div>
 
                 <!-- Topic Vote -->
-                <div id="topicvote-content" class="hidden">
-                    <div class="bg-white p-6 rounded-xl shadow-md">
-                        <h3 class="text-lg font-semibold mb-4">議題投票</h3>
-                        <p class="text-gray-500">此分頁尚在建置中。</p>
-                    </div>
-                </div>
+                 <div id="topicvote-content" class="hidden">
+                     <div class="bg-white p-6 rounded-xl shadow-md">
+                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                             <h3 class="text-lg font-semibold">議題列表</h3>
+                             <div class="flex items-center gap-2 flex-wrap">
+                                 <button id="add-topic-btn" class="bg-orange-500 text-white px-3 py-2 rounded-md hover:bg-orange-600 text-sm font-semibold">新增議題</button>
+                                 <button id="print-topics-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">列印</button>
+                             </div>
+                         </div>
+                         <div class="overflow-auto max-h-[70vh]">
+                             <table class="min-w-full divide-y divide-gray-200" style="table-layout: fixed;">
+                                 <thead class="bg-gray-50 sticky top-0" id="topics-table-head"></thead>
+                                 <tbody id="topics-table-body" class="bg-white divide-y divide-gray-200"></tbody>
+                             </table>
+                         </div>
+                     </div>
+                 </div>
 
                 <!-- Scan Vote -->
                 <div id="scanvote-content" class="hidden">
@@ -644,6 +655,7 @@
         let currentQuorumRatio = 0;
         let currentPersonQuorumRatio = 0;
         let currentResidentsPerPage = 10;
+        let currentTopics = [];
 
         // --- Firestore Paths ---
         const eventsCollectionPath = () => ["events"];
@@ -697,6 +709,10 @@
             const modalMessage = document.getElementById('modal-message');
             const modalButtons = document.getElementById('modal-buttons');
             const loader = document.getElementById('loader');
+            const addTopicBtn = document.getElementById('add-topic-btn');
+            const printTopicsBtn = document.getElementById('print-topics-btn');
+            const topicsTableHead = document.getElementById('topics-table-head');
+            const topicsTableBody = document.getElementById('topics-table-body');
             
             // Custom Print Modal Elements
             const customPrintModal = document.getElementById('custom-print-modal');
@@ -740,6 +756,27 @@
                     document.getElementById('modal-cancel-btn').onclick = () => {
                         customModal.classList.add('hidden');
                         resolve(false);
+                    };
+                });
+            }
+
+            function showCustomPrompt(message, title = '輸入') {
+                modalTitle.textContent = title;
+                modalMessage.innerHTML = `<label class="block text-sm text-gray-700 mb-2">${message}</label><input id="modal-input" type="text" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-red-500 focus:border-red-500">`;
+                modalButtons.innerHTML = `
+                    <button id="modal-ok-btn" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-red-700 focus:outline-none">確定</button>
+                    <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none">取消</button>
+                `;
+                customModal.classList.remove('hidden');
+                return new Promise((resolve) => {
+                    document.getElementById('modal-ok-btn').onclick = () => {
+                        const val = document.getElementById('modal-input').value.trim();
+                        customModal.classList.add('hidden');
+                        resolve(val || null);
+                    };
+                    document.getElementById('modal-cancel-btn').onclick = () => {
+                        customModal.classList.add('hidden');
+                        resolve(null);
                     };
                 });
             }
@@ -1121,6 +1158,17 @@
                 tabs[key].addEventListener('click', () => switchTab(key));
             });
 
+            // Topic vote actions
+            addTopicBtn.addEventListener('click', async () => {
+                const topicName = await showCustomPrompt('請輸入議題名稱');
+                if (!topicName) return;
+                currentTopics.push({ name: topicName });
+                renderTopicsTable();
+            });
+            printTopicsBtn.addEventListener('click', () => {
+                window.print();
+            });
+
             function switchTab(tabKey) {
                 if (tabKey !== 'scanner') stopScanner();
                 Object.keys(tabs).forEach(key => {
@@ -1136,6 +1184,65 @@
                     setTimeout(() => {
                         scanGunInput.focus();
                     }, 100); 
+                }
+                if (tabKey === 'topicvote') {
+                    renderTopicsTable();
+                }
+            }
+
+            function renderTopicsTable() {
+                const fixedHead = ['狀態','序號','戶號','姓名','坪數','區分權(%)'];
+                const topicHeads = currentTopics.map((t, i) => `議題${i+1}QR Code`);
+                const headHtml = `
+                    <tr>
+                        ${fixedHead.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
+                        ${topicHeads.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
+                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                    </tr>
+                `;
+                topicsTableHead.innerHTML = headHtml;
+
+                const residents = Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : [];
+                topicsTableBody.innerHTML = '';
+                residents.forEach((resident, idx) => {
+                    const tr = document.createElement('tr');
+                    tr.className = resident.isCheckedIn ? 'checked-in-row' : '';
+                    const statusBadge = resident.isCheckedIn ? '✔️' : '❌';
+                    const baseQr = resident.qrcodeValue || resident.id || String(idx+1);
+                    const topicCells = currentTopics.map((t, tIdx) => `<td class="px-4 py-2"><div id="topicqr-${resident.id}-${tIdx}" class="mx-auto"></div></td>`).join('');
+                    tr.innerHTML = `
+                        <td class="px-2 py-2 whitespace-nowrap text-center">${statusBadge}</td>
+                        <td class="px-2 py-2 whitespace-nowrap text-center">${idx + 1}</td>
+                        <td class="px-2 py-2 whitespace-nowrap truncate">${resident.unit || ''}</td>
+                        <td class="px-2 py-2 whitespace-nowrap truncate">${resident.name || ''}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.area || 0}</td>
+                        <td class="px-2 py-2 whitespace-nowrap">${resident.ownership || 0}%</td>
+                        ${topicCells}
+                        <td class="px-2 py-2 whitespace-nowrap text-sm font-medium">
+                            <button class="text-blue-600 hover:text-blue-900 text-xs py-1 px-2 rounded">詳細</button>
+                        </td>
+                    `;
+                    topicsTableBody.appendChild(tr);
+                    currentTopics.forEach((t, tIdx) => {
+                        const el = document.getElementById(`topicqr-${resident.id}-${tIdx}`);
+                        if (el) {
+                            const text = `${baseQr}|T${tIdx+1}`;
+                            new QRCode(el, { text, width: 48, height: 48 });
+                        }
+                    });
+                });
+
+                if (residents.length === 0) {
+                    topicsTableBody.innerHTML = `<tr><td colspan="${fixedHead.length + topicHeads.length + 1}" class="p-4 text-center text-gray-500">請先在「住戶管理」新增住戶</td></tr>`;
+                }
+
+                if (currentTopics.length === 0) {
+                    topicsTableHead.innerHTML = `
+                        <tr>
+                            ${fixedHead.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
+                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
+                        </tr>
+                    `;
                 }
             }
             
@@ -1306,6 +1413,9 @@
                     if (allResidentsForSelectedEvent.length === 0) {
                         residentsListTbody.innerHTML = `<tr><td colspan="10" class="p-4 text-center text-gray-500">請新增住戶</td></tr>`;
                     }
+
+                    // Refresh topics table when residents change
+                    renderTopicsTable();
 
                     updateDashboardCalculations();
                 });
