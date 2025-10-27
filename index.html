@@ -1632,7 +1632,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     }
                     const canEdit = currentUser.role === 'system_admin' || currentUser.role === 'senior_manager';
                     if (!canEdit) {
-                        showCustomAlert('您沒有更新議題設定的權限，請聯絡系統管理員。', '權限不足');
+                        showCustomAlert('無權限更新議題設定，請確認登入帳號或角色。', '權限不足');
                         return;
                     }
                     const title = document.getElementById('edit-topic-title').value.trim();
