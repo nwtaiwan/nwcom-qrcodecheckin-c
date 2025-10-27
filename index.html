@@ -1181,8 +1181,9 @@ const userDocPath = (userId) => ["users", userId];
                 unsubscribeResidents();
                 unsubscribeResidents = listenToResidents(eventId);
                 
+                // Topics are now synced via event doc snapshot in listenToEventSettings
                 unsubscribeTopics();
-                unsubscribeTopics = listenToTopics(eventId);
+                unsubscribeTopics = () => {};
                 
                 switchTab('dashboard');
             }
@@ -1202,7 +1203,11 @@ const userDocPath = (userId) => ["users", userId];
                 if (!newTopic) return;
                 showLoader();
                 try {
-                    await addDoc(collection(db, ...topicsCollectionPath(selectedEventId)), {
+                    const eventRef = doc(db, ...eventDocPath(selectedEventId));
+                    const snap = await getDoc(eventRef);
+                    const prev = (snap.exists() && Array.isArray(snap.data().topics)) ? snap.data().topics : [];
+                    const topic = {
+                        id: (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : Math.random().toString(36).slice(2),
                         title: newTopic.title,
                         description: newTopic.description,
                         proposer: newTopic.proposer,
@@ -1212,7 +1217,8 @@ const userDocPath = (userId) => ["users", userId];
                         createdAt: serverTimestamp(),
                         createdBy: currentUser.uid,
                         createdByName: currentUser.name
-                    });
+                    };
+                    await updateDoc(eventRef, { topics: [...prev, topic] });
                 } catch (error) {
                     console.error("Error adding topic:", error);
                     showCustomAlert('新增議題失敗，請稍後再試。');
@@ -1548,6 +1554,17 @@ const userDocPath = (userId) => ["users", userId];
 
                         document.getElementById('community-name-display').textContent = data.communityName || '請先設定社區名稱';
                         document.getElementById('event-title-display').textContent = data.eventName || 'QR Code 報到系統';
+                        
+                        // Sync topics from event doc (fallback when subcollection access is restricted)
+                        currentTopics = Array.isArray(data.topics) ? data.topics.slice() : [];
+                        currentTopics.sort((a, b) => {
+                            const ta = a?.createdAt?.toMillis ? a.createdAt.toMillis() : (a?.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+                            const tb = b?.createdAt?.toMillis ? b.createdAt.toMillis() : (b?.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+                            return ta - tb;
+                        });
+                        renderTopicsMetaList();
+                        renderTopicsTable();
+                        
                         updateDashboardCalculations();
                     }
                 });
