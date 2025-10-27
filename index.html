@@ -648,7 +648,7 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc, writeBatch, getDocs, serverTimestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, setDoc, collection, addDoc, query, where, onSnapshot, deleteDoc, updateDoc, writeBatch, getDocs, serverTimestamp, Timestamp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- Firebase Configuration ---
         const firebaseConfig = {
@@ -1214,7 +1214,7 @@ const userDocPath = (userId) => ["users", userId];
                         options: newTopic.options,
                         multiSelect: newTopic.multiSelect,
                         maxSelections: newTopic.maxSelections,
-                        createdAt: serverTimestamp(),
+                        createdAt: Timestamp.now(),
                         createdBy: currentUser.uid,
                         createdByName: currentUser.name
                     };
