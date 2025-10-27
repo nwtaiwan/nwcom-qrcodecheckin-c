@@ -351,22 +351,7 @@
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
                             <h3 class="text-lg font-semibold">投票儀表板</h3>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                                <div>
-                                    <p class="text-sm font-medium text-gray-500">投票總數</p>
-                                    <p id="total-votes" class="text-3xl font-bold text-red-600">0</p>
-                                </div>
-                            </div>
-                            <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                                <div class="w-full">
-                                    <p class="text-sm font-medium text-gray-500">最近投票</p>
-                                    <ul id="recent-votes-list" class="space-y-2 max-h-80 overflow-y-auto">
-                                        <li class="text-gray-500 text-center">尚無投票紀錄</li>
-                                    </ul>
-                                </div>
-                            </div>
-                        </div>
+                        <!-- 移除投票總數與最近投票區塊，改為每議題統計 -->
                         <div class="mt-6">
                             <h4 class="text-base font-semibold mb-3">各議題投票統計</h4>
                             <div id="topic-vote-stats" class="space-y-4"></div>
@@ -1633,13 +1618,20 @@ const topicCells = currentTopics.map((t, tIdx) => `
                         <div id="${qrId}"></div>
                         <div class="text-sm mt-2 text-gray-700">代碼：${code}</div>
                         <div class="text-lg mt-1 font-semibold">${opt.label}</div>
-                        <button id="${btnId}" class="mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md shadow-sm hover:bg-blue-700 focus:outline-none">手動投票</button>
+                        <button id="${btnId}" class="manual-vote-btn mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md shadow-sm hover:bg-blue-700 focus:outline-none">手動投票</button>
                     `;
                     container.appendChild(wrap);
                     const el = document.getElementById(qrId);
                     if (el) new QRCode(el, { text: code, width: 96, height: 96 });
                     const btn = document.getElementById(btnId);
-                    if (btn) btn.onclick = () => handleVoteScan(code, '手動投票');
+                    if (btn) btn.onclick = () => {
+                        const allBtns = container.querySelectorAll('.manual-vote-btn');
+                        allBtns.forEach(b => {
+                            b.disabled = true;
+                            b.className = 'manual-vote-btn mt-2 px-3 py-1.5 bg-gray-400 text-white text-sm rounded-md shadow-sm cursor-not-allowed';
+                        });
+                        handleVoteScan(code, '手動投票');
+                    };
                 });
             }
 
@@ -1927,31 +1919,8 @@ const topicCells = currentTopics.map((t, tIdx) => `
                     scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">掃碼紀錄將顯示於此</li>`;
                 }
 
-                // --- Vote Dashboard ---
-                const totalVotesEl = document.getElementById('total-votes');
-                const recentVotesListEl = document.getElementById('recent-votes-list');
+                // 移除「投票總數／最近投票」展示，僅保留每議題統計
                 const votes = Array.isArray(currentVotes) ? currentVotes.slice() : [];
-                totalVotesEl.textContent = votes.length;
-                if (votes.length > 0) {
-                    recentVotesListEl.innerHTML = '';
-                    votes.sort((a, b) => {
-                        const at = a?.createdAt?.toMillis ? a.createdAt.toMillis() : (a?.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
-                        const bt = b?.createdAt?.toMillis ? b.createdAt.toMillis() : (b?.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
-                        return bt - at;
-                    });
-                    const opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
-                    votes.slice(0, 10).forEach(v => {
-                        const ms = v?.createdAt?.toMillis ? v.createdAt.toMillis() : (v?.createdAt?.seconds ? v.createdAt.seconds * 1000 : 0);
-                        const time = ms ? new Date(ms).toLocaleString('zh-TW', opts).replace(/\//g, '-') : 'N/A';
-                        const op = v.optionLabel || `選項${(v.optionIndex || 0) + 1}`;
-                        recentVotesListEl.innerHTML += `<li class="p-2 bg-gray-100 rounded-md">
-                            <div><span class="font-bold">${v.unit || ''} ${v.name || ''}</span> - ${time}</div>
-                            <span class="text-sm text-gray-500 block">投票：議題${v.topicSerial || '-'} - ${op}</span>
-                        </li>`;
-                    });
-                } else {
-                    recentVotesListEl.innerHTML = '<li class="text-gray-500 text-center">尚無投票紀錄</li>';
-                }
 
                 // --- Per-Topic Vote Stats (counts + ownership sums) ---
                 const topicStatsContainer = document.getElementById('topic-vote-stats');
