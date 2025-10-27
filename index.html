@@ -1613,10 +1613,18 @@ const userDocPath = (userId) => ["users", userId];
                     const wrap = document.createElement('div');
                     wrap.className = 'flex flex-col items-center';
                     const qrId = `voteqr-${residentIdx}-${topicIdx}-${optIdx}`;
-                    wrap.innerHTML = `<div id="${qrId}"></div><div class="text-xs mt-1 text-gray-600">${opt.label}（代碼：${code}）</div>`;
+                    const btnId = `manualvote-${residentIdx}-${topicIdx}-${optIdx}`;
+                    wrap.innerHTML = `
+                        <div id="${qrId}"></div>
+                        <div class="text-sm mt-2 text-gray-700">代碼：${code}</div>
+                        <div class="text-lg mt-1 font-semibold">${opt.label}</div>
+                        <button id="${btnId}" class="mt-2 px-3 py-1.5 bg-blue-600 text-white text-sm rounded-md shadow-sm hover:bg-blue-700 focus:outline-none">手動投票</button>
+                    `;
                     container.appendChild(wrap);
                     const el = document.getElementById(qrId);
                     if (el) new QRCode(el, { text: code, width: 96, height: 96 });
+                    const btn = document.getElementById(btnId);
+                    if (btn) btn.onclick = () => handleVoteScan(code, '手動投票');
                 });
             }
 
@@ -2040,6 +2048,9 @@ const userDocPath = (userId) => ["users", userId];
                     if (!html5QrCodeVote) html5QrCodeVote = new Html5Qrcode('vote-reader');
                     html5QrCodeVote.start({ facingMode: 'environment' }, config, (decodedText) => handleVoteScan(decodedText, '攝影機'))
                         .then(() => {
+                            // 啟動掃描時重置重複碼記錄，避免跨次掃描受到前次影響
+                            lastVotedCode = null;
+                            lastVoteScanTime = 0;
                             startScanVoteBtn.disabled = true;
                             stopScanVoteBtn.disabled = false;
                             document.getElementById('vote-reader-placeholder').textContent = '';
@@ -2061,7 +2072,12 @@ const userDocPath = (userId) => ["users", userId];
             async function handleVoteScan(decodedText, source) {
                 if (!selectedEventId) return;
                 const now = Date.now();
-                if (now - lastVoteScanTime < 3000 && lastVotedCode === decodedText) {
+                // 靜默忽略攝影機持續讀取的相同 QR Code，避免語音重覆播放
+                if (source === '攝影機' && lastVotedCode === decodedText) {
+                    return;
+                }
+                // 非攝影機來源保留 3 秒抑制重複提示
+                if (source !== '攝影機' && now - lastVoteScanTime < 3000 && lastVotedCode === decodedText) {
                     const s = document.getElementById('scanvote-status');
                     s.textContent = '重複投票：此QR Code已記錄';
                     s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-yellow-100 text-yellow-800';
