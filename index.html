@@ -359,9 +359,11 @@
                                 </div>
                             </div>
                             <div class="bg-white p-6 rounded-xl shadow-md flex items-center justify-between">
-                                <div>
+                                <div class="w-full">
                                     <p class="text-sm font-medium text-gray-500">最近投票</p>
-                                    <p class="text-gray-400 text-sm">即將提供</p>
+                                    <ul id="recent-votes-list" class="space-y-2 max-h-80 overflow-y-auto">
+                                        <li class="text-gray-500 text-center">尚無投票紀錄</li>
+                                    </ul>
                                 </div>
                             </div>
                         </div>
@@ -394,8 +396,34 @@
                 <!-- Scan Vote -->
                 <div id="scanvote-content" class="hidden">
                     <div class="bg-white p-6 rounded-xl shadow-md">
-                        <h3 class="text-lg font-semibold mb-4">掃碼投票</h3>
-                        <p class="text-gray-500">此分頁尚在建置中。</p>
+                        <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
+                            <h3 class="text-lg font-semibold">掃碼投票</h3>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div>
+                                <div class="flex items-center gap-2">
+                                    <button id="start-scanvote-btn" class="flex-1 bg-green-500 text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 disabled:bg-gray-400">開始掃碼</button>
+                                    <button id="stop-scanvote-btn" class="flex-1 bg-red-500 text-white font-bold py-2 px-4 rounded-md hover:bg-red-600 disabled:bg-gray-400" disabled>停止掃碼</button>
+                                </div>
+                                <div id="vote-reader" class="mt-4 aspect-video bg-gray-100 rounded-md flex items-center justify-center">
+                                    <p id="vote-reader-placeholder" class="text-gray-500">請點擊 "開始掃碼"</p>
+                                </div>
+                                <div id="scanvote-status" class="mt-4 text-center font-semibold p-3 rounded-md">&nbsp;</div>
+                            </div>
+                            <div>
+                                <h4 class="text-lg font-semibold mb-4">掃碼槍輸入</h4>
+                                <form id="scanvote-gun-form" class="mb-4">
+                                    <label for="scanvote-gun-input" class="sr-only">QR Code</label>
+                                    <input type="text" id="scanvote-gun-input" placeholder="將游標點擊此處後開始掃碼..." class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                </form>
+                                <div>
+                                    <h4 class="font-semibold mb-2">最近投票：</h4>
+                                    <ul id="scanvote-recent-list" class="space-y-2 max-h-80 overflow-y-auto">
+                                        <li class="text-gray-500 text-center">掃碼紀錄將顯示於此</li>
+                                    </ul>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -684,6 +712,7 @@ let currentQuorumRatio = 0;
 let currentPersonQuorumRatio = 0;
 let currentResidentsPerPage = 10;
 let currentTopics = [];
+let currentVotes = [];
 let unsubscribeTopics = () => {};
 
         // --- Firestore Paths ---
@@ -1495,6 +1524,15 @@ const userDocPath = (userId) => ["users", userId];
             function buildVoteCode(residentSerial, topicSerial, optionIndex) {
                 return `A${padNumber(residentSerial,3)}M${padNumber(topicSerial,2)}${getOptionCode(optionIndex)}`;
             }
+            function getOptionIndexFromCode(letter) {
+                const map = ['T','F','N','A','B','C','D','E','G','H'];
+                const idx = map.indexOf(letter);
+                if (idx >= 0) return idx;
+                const code = letter.charCodeAt(0);
+                const Icode = 'I'.charCodeAt(0);
+                if (code >= Icode) return (code - Icode) + map.length;
+                return -1;
+            }
 
             function showTopicVoteModal(resident, topic, topicIdx, residentIdx) {
                 const proposerText = topic?.proposer?.type === 'resident' ? `住戶(${topic?.proposer?.unit || ''})` : '管委會';
@@ -1562,6 +1600,10 @@ const userDocPath = (userId) => ["users", userId];
                             const tb = b?.createdAt?.toMillis ? b.createdAt.toMillis() : (b?.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
                             return ta - tb;
                         });
+
+                        // Sync votes from event doc for dashboard and scan vote
+                        currentVotes = Array.isArray(data.votes) ? data.votes.slice() : [];
+
                         renderTopicsMetaList();
                         renderTopicsTable();
                         
@@ -1808,6 +1850,32 @@ const userDocPath = (userId) => ["users", userId];
                     recentCheckInsList.innerHTML = `<tr><td colspan="4" class="p-4 text-center text-gray-500">尚無報到紀錄</td></tr>`;
                     scannerRecentList.innerHTML = `<li class="text-gray-500 text-center">掃碼紀錄將顯示於此</li>`;
                 }
+
+                // --- Vote Dashboard ---
+                const totalVotesEl = document.getElementById('total-votes');
+                const recentVotesListEl = document.getElementById('recent-votes-list');
+                const votes = Array.isArray(currentVotes) ? currentVotes.slice() : [];
+                totalVotesEl.textContent = votes.length;
+                if (votes.length > 0) {
+                    recentVotesListEl.innerHTML = '';
+                    votes.sort((a, b) => {
+                        const at = a?.createdAt?.toMillis ? a.createdAt.toMillis() : (a?.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+                        const bt = b?.createdAt?.toMillis ? b.createdAt.toMillis() : (b?.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+                        return bt - at;
+                    });
+                    const opts = { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false };
+                    votes.slice(0, 10).forEach(v => {
+                        const ms = v?.createdAt?.toMillis ? v.createdAt.toMillis() : (v?.createdAt?.seconds ? v.createdAt.seconds * 1000 : 0);
+                        const time = ms ? new Date(ms).toLocaleString('zh-TW', opts).replace(/\//g, '-') : 'N/A';
+                        const op = v.optionLabel || `選項${(v.optionIndex || 0) + 1}`;
+                        recentVotesListEl.innerHTML += `<li class="p-2 bg-gray-100 rounded-md">
+                            <div><span class="font-bold">${v.unit || ''} ${v.name || ''}</span> - ${time}</div>
+                            <span class="text-sm text-gray-500 block">投票：議題${v.topicSerial || '-'} - ${op}</span>
+                        </li>`;
+                    });
+                } else {
+                    recentVotesListEl.innerHTML = '<li class="text-gray-500 text-center">尚無投票紀錄</li>';
+                }
             }
             
             document.getElementById('residents-list').addEventListener('click', async e => {
@@ -1881,6 +1949,124 @@ const userDocPath = (userId) => ["users", userId];
             });
 
             stopScanBtn.addEventListener('click', stopScanner);
+
+            // --- QR Scan Vote ---
+            let html5QrCodeVote = null;
+            let lastVoteScanTime = 0, lastVotedCode = null;
+
+            const startScanVoteBtn = document.getElementById('start-scanvote-btn');
+            const stopScanVoteBtn = document.getElementById('stop-scanvote-btn');
+            const scanVoteGunForm = document.getElementById('scanvote-gun-form');
+            const scanVoteGunInput = document.getElementById('scanvote-gun-input');
+
+            scanVoteGunForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const code = (scanVoteGunInput.value || '').trim();
+                if (!code) return;
+                handleVoteScan(code, '掃碼槍');
+                scanVoteGunInput.value = '';
+            });
+
+            function stopVoteScanner() {
+                if (html5QrCodeVote && html5QrCodeVote.isScanning) {
+                    html5QrCodeVote.stop()
+                        .then(() => {
+                            startScanVoteBtn.disabled = false;
+                            stopScanVoteBtn.disabled = true;
+                            document.getElementById('scanvote-status').innerHTML = '&nbsp;';
+                            document.getElementById('scanvote-status').className = 'mt-4 text-center font-semibold p-3 rounded-md';
+                            document.getElementById('vote-reader-placeholder').textContent = '請點擊 "開始掃碼"';
+                        })
+                        .catch(err => console.log('QR vote scanner stop failed.', err));
+                }
+            }
+
+            startScanVoteBtn.addEventListener('click', () => {
+                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+                try {
+                    if (!html5QrCodeVote) html5QrCodeVote = new Html5Qrcode('vote-reader');
+                    html5QrCodeVote.start({ facingMode: 'environment' }, config, (decodedText) => handleVoteScan(decodedText, '攝影機'))
+                        .then(() => {
+                            startScanVoteBtn.disabled = true;
+                            stopScanVoteBtn.disabled = false;
+                            document.getElementById('vote-reader-placeholder').textContent = '';
+                        })
+                        .catch(() => {
+                            const s = document.getElementById('scanvote-status');
+                            s.textContent = '無法啟動攝影機。請確認權限。';
+                            s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                        });
+                } catch (e) {
+                    const s = document.getElementById('scanvote-status');
+                    s.textContent = '無法啟動攝影機。請確認權限。';
+                    s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                }
+            });
+
+            stopScanVoteBtn.addEventListener('click', stopVoteScanner);
+
+            async function handleVoteScan(decodedText, source) {
+                if (!selectedEventId) return;
+                const now = Date.now();
+                if (now - lastVoteScanTime < 3000 && lastVotedCode === decodedText) return;
+                lastVoteScanTime = now;
+                lastVotedCode = decodedText;
+
+                const statusEl = document.getElementById('scanvote-status');
+                const voteList = document.getElementById('scanvote-recent-list');
+
+                const match = decodedText.match(/^A(\d{3})M(\d{2})([A-Z])$/);
+                if (!match) {
+                    statusEl.textContent = '無效的投票碼';
+                    statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    return;
+                }
+                const residentSerial = parseInt(match[1], 10);
+                const topicSerial = parseInt(match[2], 10);
+                const optionLetter = match[3];
+                const optionIndex = getOptionIndexFromCode(optionLetter);
+
+                const resident = allResidentsForSelectedEvent[residentSerial - 1];
+                const topic = currentTopics[topicSerial - 1];
+                if (!resident || !topic || optionIndex < 0 || !Array.isArray(topic.options) || !topic.options[optionIndex]) {
+                    statusEl.textContent = '投票碼對應資料不存在';
+                    statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    return;
+                }
+
+                const label = topic.options[optionIndex].label || `選項${optionIndex + 1}`;
+                const simpleTime = new Date().toLocaleTimeString('zh-TW');
+                voteList.innerHTML = `<li class=\"p-2 bg-gray-100 rounded-md\"><div><span class=\"font-bold\">${resident.unit} ${resident.name}</span> - ${simpleTime}</div><span class=\"text-sm text-gray-500 block\">投票：議題${topicSerial} - ${label}</span></li>` + voteList.innerHTML;
+
+                showLoader();
+                const eventRef = doc(db, ...eventDocPath(selectedEventId));
+                try {
+                    const snap = await getDoc(eventRef);
+                    const prev = (snap.exists() && Array.isArray(snap.data().votes)) ? snap.data().votes : [];
+                    const vote = {
+                        residentId: resident.id,
+                        unit: resident.unit,
+                        name: resident.name,
+                        topicId: topic.id,
+                        topicSerial,
+                        optionIndex,
+                        optionLabel: label,
+                        code: decodedText,
+                        createdAt: Timestamp.now(),
+                        source,
+                        createdBy: currentUser.name
+                    };
+                    await updateDoc(eventRef, { votes: [...prev, vote] });
+                    statusEl.textContent = `投票成功：${resident.unit} ${resident.name} → 議題${topicSerial}「${label}」`;
+                    statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-green-100 text-green-800';
+                } catch (err) {
+                    console.error('Vote persist error:', err);
+                    statusEl.textContent = '投票儲存失敗';
+                    statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                } finally {
+                    hideLoader();
+                }
+            }
 
             function stopScanner() {
                 if (html5QrCode && html5QrCode.isScanning) {
