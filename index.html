@@ -2159,6 +2159,7 @@ const userDocPath = (userId) => ["users", userId];
 
             async function deleteEventAndSubcollection(eventId) {
                 if (!eventId) return;
+                // Delete residents subcollection
                 const residentsColRef = collection(db, ...residentsCollectionPath(eventId));
                 const residentsSnapshot = await getDocs(residentsColRef);
                 if (!residentsSnapshot.empty) {
@@ -2166,6 +2167,15 @@ const userDocPath = (userId) => ["users", userId];
                     residentsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
                     await batch.commit();
                 }
+                // Delete topics subcollection
+                const topicsColRef = collection(db, ...topicsCollectionPath(eventId));
+                const topicsSnapshot = await getDocs(topicsColRef);
+                if (!topicsSnapshot.empty) {
+                    const batch2 = writeBatch(db);
+                    topicsSnapshot.docs.forEach(doc => batch2.delete(doc.ref));
+                    await batch2.commit();
+                }
+                // Finally delete the event doc
                 await deleteDoc(doc(db, ...eventDocPath(eventId)));
             }
             
