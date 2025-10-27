@@ -641,7 +641,7 @@
 
     <!-- Custom Modal -->
     <div id="custom-modal" class="fixed inset-0 bg-gray-900 bg-opacity-60 overflow-y-auto h-full w-full hidden z-50 flex items-center justify-center">
-        <div class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
+        <div id="custom-modal-dialog" class="relative mx-auto p-5 border w-full max-w-md shadow-lg rounded-md bg-white">
             <div class="mt-3 text-center">
                 <h3 id="modal-title" class="text-lg leading-6 font-medium text-gray-900"></h3>
                 <div class="mt-2 px-7 py-3">
@@ -1342,15 +1342,20 @@ const userDocPath = (userId) => ["users", userId];
                     tr.className = resident.isCheckedIn ? 'checked-in-row' : '';
                     const statusBadge = resident.isCheckedIn ? '✔️' : '❌';
                     const canVote = !!resident.isCheckedIn;
-const topicCells = currentTopics.map((t, tIdx) => `
+const topicCells = currentTopics.map((t, tIdx) => {
+    const hasVoted = (Array.isArray(currentVotes) ? currentVotes : []).some(v => v.residentId === resident.id && v.topicId === t.id);
+    const voteDisabled = !canVote || hasVoted;
+    const voteBtnClass = voteDisabled ? 'bg-gray-400 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700';
+    const editBtnClass = canVote ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed';
+    return `
     <td class="px-4 py-2 text-center">
         <div class="flex flex-col items-center gap-1">
-            <button class="topic-vote-btn ${canVote ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button>
-            <button class="topic-edit-btn ${canVote ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">編輯</button>
+            <button class="topic-vote-btn ${voteBtnClass} text-white text-xs px-2 py-1 rounded" ${voteDisabled ? 'disabled' : ''} data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button>
+            <button class="topic-edit-btn ${editBtnClass} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">編輯</button>
             <button class="topic-reset-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded" data-resident-index="${idx}" data-topic-index="${tIdx}">重設</button>
         </div>
-    </td>
-`).join('');
+    </td>`;
+}).join('');
                     tr.innerHTML = `
                         <td class="px-2 py-2 whitespace-nowrap text-center">${statusBadge}</td>
                         <td class="px-2 py-2 whitespace-nowrap text-center">${idx + 1}</td>
@@ -2308,6 +2313,19 @@ const topicCells = currentTopics.map((t, tIdx) => `
 
             // 顯示單一議題的投票明細對話框（住戶整合視圖 + 原始逐票視圖）
             function openTopicVoteDetailsModal(topic, topicIdx) {
+                const dialogEl = document.getElementById('custom-modal-dialog');
+                const prevMaxWidth = dialogEl ? dialogEl.style.maxWidth : '';
+                if (dialogEl) {
+                    dialogEl.style.maxWidth = '72rem'; // 擴寬至約 1152px
+                }
+                // 內容可滾動，避免視窗過高時遮蔽
+                try {
+                    const msgBox = document.getElementById('modal-message');
+                    if (msgBox) {
+                        msgBox.style.maxHeight = '70vh';
+                        msgBox.style.overflow = 'auto';
+                    }
+                } catch (_) {}
                 const residentsById = {};
                 (Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : []).forEach(r => { residentsById[r.id] = r; });
                 const tvotes = (Array.isArray(currentVotes) ? currentVotes : []).filter(v => v.topicId === topic.id);
@@ -2441,6 +2459,17 @@ const topicCells = currentTopics.map((t, tIdx) => `
                 };
                 document.getElementById('modal-close-btn').onclick = () => {
                     customModal.classList.add('hidden');
+                    // 還原寬度與滾動樣式
+                    if (dialogEl) {
+                        dialogEl.style.maxWidth = prevMaxWidth || '';
+                    }
+                    try {
+                        const msgBox = document.getElementById('modal-message');
+                        if (msgBox) {
+                            msgBox.style.maxHeight = '';
+                            msgBox.style.overflow = '';
+                        }
+                    } catch (_) {}
                 };
             }
 
