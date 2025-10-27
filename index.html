@@ -367,6 +367,10 @@
                                 </div>
                             </div>
                         </div>
+                        <div class="mt-6">
+                            <h4 class="text-base font-semibold mb-3">各議題投票統計</h4>
+                            <div id="topic-vote-stats" class="space-y-4"></div>
+                        </div>
                     </div>
                 </div>
 
@@ -1352,7 +1356,12 @@ const userDocPath = (userId) => ["users", userId];
                     const tr = document.createElement('tr');
                     tr.className = resident.isCheckedIn ? 'checked-in-row' : '';
                     const statusBadge = resident.isCheckedIn ? '✔️' : '❌';
-                    const topicCells = currentTopics.map((t, tIdx) => `<td class="px-4 py-2 text-center"><button class="topic-vote-btn bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded" data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button></td>`).join('');
+                    const canVote = !!resident.isCheckedIn;
+const topicCells = currentTopics.map((t, tIdx) => `
+    <td class="px-4 py-2 text-center">
+        <button class="topic-vote-btn ${canVote ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button>
+    </td>
+`).join('');
                     tr.innerHTML = `
                         <td class="px-2 py-2 whitespace-nowrap text-center">${statusBadge}</td>
                         <td class="px-2 py-2 whitespace-nowrap text-center">${idx + 1}</td>
@@ -1588,6 +1597,12 @@ const userDocPath = (userId) => ["users", userId];
             }
 
             function showTopicVoteModal(resident, topic, topicIdx, residentIdx) {
+    // 僅限已報到住戶可投票
+    if (!resident?.isCheckedIn) {
+        showCustomAlert('尚未報到：此住戶不可投票', '禁止投票');
+        try { speak('尚未報到不可投票'); } catch (_) {}
+        return;
+    }
                 const proposerText = topic?.proposer?.type === 'resident' ? `住戶(${topic?.proposer?.unit || ''})` : '管委會';
                 const options = Array.isArray(topic.options) ? topic.options : [];
 
@@ -1937,6 +1952,47 @@ const userDocPath = (userId) => ["users", userId];
                 } else {
                     recentVotesListEl.innerHTML = '<li class="text-gray-500 text-center">尚無投票紀錄</li>';
                 }
+
+                // --- Per-Topic Vote Stats (counts + ownership sums) ---
+                const topicStatsContainer = document.getElementById('topic-vote-stats');
+                if (topicStatsContainer) {
+                    const residentsById = {};
+                    (Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : []).forEach(r => { residentsById[r.id] = r; });
+                    const eligibleCount = (Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : []).filter(r => r.isCheckedIn).length;
+                    let html = '';
+                    (Array.isArray(currentTopics) ? currentTopics : []).forEach((t, idx) => {
+                        const tvotes = votes.filter(v => v.topicId === t.id);
+                        const optionStats = (Array.isArray(t.options) ? t.options : []).map((opt, optIdx) => {
+                            const ovotes = tvotes.filter(v => v.optionIndex === optIdx);
+                            let ownershipSum = 0;
+                            ovotes.forEach(v => { const rr = residentsById[v.residentId]; ownershipSum += parseFloat(rr?.ownership) || 0; });
+                            return { label: opt.label || `選項${optIdx + 1}`, count: ovotes.length, ownership: ownershipSum };
+                        });
+                        const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                        const optsHtml = optionStats.map(s => {
+                            const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
+                            return `
+                                <div class="${highlight} rounded-md p-3">
+                                    <div class="font-semibold">${s.label}</div>
+                                    <div class="text-sm text-gray-600">票數：${s.count}</div>
+                                    <div class="text-sm text-gray-600">區分權合計：${s.ownership.toFixed(4)}%</div>
+                                </div>
+                            `;
+                        }).join('');
+                        html += `
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <div class="font-semibold">議題${idx + 1}：${t.title || ''}</div>
+                                    <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                                    ${optsHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    topicStatsContainer.innerHTML = html || '<div class="text-gray-500 text-sm">尚未設定議題</div>';
+                }
             }
             
             document.getElementById('residents-list').addEventListener('click', async e => {
@@ -2108,6 +2164,13 @@ const userDocPath = (userId) => ["users", userId];
                     statusEl.textContent = '投票失敗：投票碼對應資料不存在';
                     statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
                     speak('投票失敗');
+                    return;
+                }
+                // 僅限已報到住戶可投票
+                if (!resident.isCheckedIn) {
+                    statusEl.textContent = '禁止投票：尚未報到';
+                    statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    try { speak('尚未報到不可投票'); } catch (_) {}
                     return;
                 }
 
