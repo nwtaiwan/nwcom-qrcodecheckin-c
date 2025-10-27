@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>西北社區QR Code報到系統</title>
+    <title>西北社區QR Code報到與投票系統V3</title>
     <link rel="icon" type="image/png" href="https://static.wixstatic.com/media/6148f9_4ebee1eb9c114124805fddcbbc8c6e28~mv2.png">
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -131,7 +131,7 @@
             <div class="flex justify-center mb-4">
                 <img src="https://static.wixstatic.com/media/6148f9_4ebee1eb9c114124805fddcbbc8c6e28~mv2.png" alt="公司標誌" style="width: 80px; height: 80px;">
             </div>
-            <h1 class="text-lg sm:text-xl font-bold text-center text-gray-900">西北社區QR Code報到系統</h1>
+            <h1 class="text-lg sm:text-xl font-bold text-center text-gray-900">西北社區QR Code報到與投票系統V3</h1>
             <form id="login-form" class="mt-8">
                 <div class="mb-4">
                     <div class="flex justify-between items-center mb-1">
@@ -162,7 +162,7 @@
                     <button id="create-event-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">新增會議活動</button>
                     <button id="user-management-btn" class="bg-green-500 text-white font-bold py-2 px-4 rounded-md hover:bg-green-600">帳號管理</button>
                     <div class="text-right">
-                        <h2 class="font-bold text-gray-800">西北社區QR Code報到系統V1</h2>
+                        <h2 class="font-bold text-gray-800">西北社區QR Code報到與投票系統V3</h2>
                         <p class="text-xs text-gray-500">西北好用心  生活更安心</p>
                         <div class="mt-1">
                              <span id="user-display" class="text-sm text-gray-500"></span>
@@ -191,7 +191,7 @@
                     <p id="event-title-display" class="text-2xl text-gray-800 mt-1">QR Code 報到系統</p>
                 </div>
                 <div class="text-right">
-                    <h2 class="font-bold text-gray-800">西北社區QR Code投票系統</h2>
+                    <h2 class="font-bold text-gray-800">西北社區QR Code投票與投票系統V3</h2>
                     <p class="text-xs text-gray-500">西北好用心  生活更安心</p>
                     <div class="mt-1">
                         <span id="user-display-details" class="text-sm text-gray-500"></span>
@@ -350,6 +350,12 @@
                     <div class="bg-white p-6 rounded-xl shadow-md">
                         <div class="flex flex-wrap justify-between items-center mb-4 gap-4">
                             <h3 class="text-lg font-semibold">投票儀表板</h3>
+                            <div class="flex items-center gap-2">
+                                <button id="share-vote-dashboard-btn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600 flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor"><path d="M15 8a3 3 0 10-2.977-2.63l-4.94 2.47a3 3 0 100 4.319l4.94 2.47a3 3 0 10.895-1.789l-4.94-2.47a3.027 3.027 0 000-.74l4.94-2.47C13.456 7.68 14.19 8 15 8z" /></svg>
+                                    分享
+                                </button>
+                            </div>
                         </div>
                         <!-- 移除投票總數與最近投票區塊，改為每議題統計 -->
                         <div class="mt-6">
@@ -747,6 +753,7 @@ const userDocPath = (userId) => ["users", userId];
             const scanGunInput = document.getElementById('scan-gun-input');
             const loginForm = document.getElementById('login-form');
             const shareDashboardBtn = document.getElementById('share-dashboard-btn');
+            const shareVoteDashboardBtn = document.getElementById('share-vote-dashboard-btn');
             const shareModal = document.getElementById('share-modal');
             const closeShareModalBtn = document.getElementById('close-share-modal-btn');
             const shareQrCodeContainer = document.getElementById('share-qr-code');
@@ -3259,6 +3266,17 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 shareModal.classList.remove('hidden');
             });
 
+            if (shareVoteDashboardBtn) {
+                shareVoteDashboardBtn.addEventListener('click', () => {
+                    const url = `${window.location.origin}${window.location.pathname}?view=public&event=${selectedEventId}&target=vote`;
+                    shareQrCodeContainer.innerHTML = '';
+                    new QRCode(shareQrCodeContainer, { text: url, width: 256, height: 256 });
+                    shareLink.href = url;
+                    shareUrlDisplay.textContent = url;
+                    shareModal.classList.remove('hidden');
+                });
+            }
+
             closeShareModalBtn.addEventListener('click', () => {
                 shareModal.classList.add('hidden');
             });
@@ -3488,6 +3506,9 @@ const topicCells = currentTopics.map((t, tIdx) => {
             const publicEventTitle = document.getElementById('public-event-title-display');
             const publicDashboardContent = document.getElementById('public-dashboard-content');
 
+            const params = new URLSearchParams(window.location.search);
+            const publicTarget = (params.get('target') || 'checkin').toLowerCase();
+
             const eventRef = doc(db, ...eventDocPath(eventId));
             onSnapshot(eventRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -3498,7 +3519,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     onSnapshot(residentsColRef, (residentsSnapshot) => {
                         const residents = [];
                         residentsSnapshot.forEach(doc => residents.push(doc.data()));
-                        renderPublicDashboard(data, residents);
+                        if (publicTarget === 'vote') {
+                            renderPublicVoteDashboard(data, residents);
+                        } else {
+                            renderPublicDashboard(data, residents);
+                        }
                     });
                 } else {
                     publicCommunityName.textContent = '找不到活動';
@@ -3553,6 +3578,71 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         <span class="${ownershipQuorumReached ? '' : 'hidden'} text-green-600 font-bold text-lg">已達法定開會區分權比例</span>
                     </div>
                 `;
+            }
+
+            function renderPublicVoteDashboard(eventData, residentsData) {
+                const topics = Array.isArray(eventData.topics) ? eventData.topics : [];
+                const votes = Array.isArray(eventData.votes) ? eventData.votes : [];
+                const residentsById = {};
+                (Array.isArray(residentsData) ? residentsData : []).forEach(r => { residentsById[r.id] = r; });
+                const eligibleCount = (Array.isArray(residentsData) ? residentsData : []).filter(r => r.isCheckedIn).length;
+
+                function getTopicDisplayNamePublic(topic, idx) {
+                    const prefix = topic?.labelPrefix || '議題';
+                    const serial = topic?.serialText || (idx + 1);
+                    return `${prefix}${serial}`;
+                }
+
+                if (topics.length === 0) {
+                    publicDashboardContent.innerHTML = '<div class="text-gray-500 text-sm">尚未設定議題</div>';
+                    return;
+                }
+
+                let html = '';
+                topics.forEach((t, idx) => {
+                    const tvotes = votes.filter(v => v.topicId === t.id);
+                    const selectionByResident = new Map();
+                    tvotes.forEach(v => {
+                        if (!selectionByResident.has(v.residentId)) selectionByResident.set(v.residentId, new Set());
+                        selectionByResident.get(v.residentId).add(v.optionIndex);
+                    });
+                    const optionStats = (Array.isArray(t.options) ? t.options : []).map((opt, optIdx) => {
+                        let count = 0;
+                        let ownershipSum = 0;
+                        selectionByResident.forEach((set, rid) => {
+                            if (set.has(optIdx)) {
+                                count++;
+                                const rr = residentsById[rid];
+                                ownershipSum += parseFloat(rr?.ownership) || 0;
+                            }
+                        });
+                        return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
+                    });
+                    const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                    const optsHtml = optionStats.map(s => {
+                        const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
+                        return `
+                            <div class="${highlight} rounded-md p-3">
+                                <div class="font-semibold">${s.label}</div>
+                                <div class="text-sm text-gray-600">票數：${s.count}</div>
+                                <div class="text-sm text-gray-600">區分權合計：${s.ownership.toFixed(4)}%</div>
+                            </div>
+                        `;
+                    }).join('');
+                    html += `
+                        <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <div class="flex items-center justify-between">
+                                <div class="font-semibold">${getTopicDisplayNamePublic(t, idx)}：${t.title || ''}</div>
+                                <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                            </div>
+                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                                ${optsHtml}
+                            </div>
+                        </div>
+                    `;
+                });
+
+                publicDashboardContent.innerHTML = html;
             }
         }
     </script>
