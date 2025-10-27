@@ -2178,11 +2178,24 @@ const topicCells = currentTopics.map((t, tIdx) => `
                     let html = '';
                     (Array.isArray(currentTopics) ? currentTopics : []).forEach((t, idx) => {
                         const tvotes = votes.filter(v => v.topicId === t.id);
+                        // 以「住戶」為單位去重，同一住戶同一選項只計一次
+                        // 建立 residentId -> Set<optionIndex> 的映射
+                        const selectionByResident = new Map();
+                        tvotes.forEach(v => {
+                            if (!selectionByResident.has(v.residentId)) selectionByResident.set(v.residentId, new Set());
+                            selectionByResident.get(v.residentId).add(v.optionIndex);
+                        });
                         const optionStats = (Array.isArray(t.options) ? t.options : []).map((opt, optIdx) => {
-                            const ovotes = tvotes.filter(v => v.optionIndex === optIdx);
+                            let count = 0;
                             let ownershipSum = 0;
-                            ovotes.forEach(v => { const rr = residentsById[v.residentId]; ownershipSum += parseFloat(rr?.ownership) || 0; });
-                            return { label: opt.label || `選項${optIdx + 1}`, count: ovotes.length, ownership: ownershipSum };
+                            selectionByResident.forEach((set, rid) => {
+                                if (set.has(optIdx)) {
+                                    count++;
+                                    const rr = residentsById[rid];
+                                    ownershipSum += parseFloat(rr?.ownership) || 0;
+                                }
+                            });
+                            return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
                         });
                         const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
                         const optsHtml = optionStats.map(s => {
@@ -2199,7 +2212,10 @@ const topicCells = currentTopics.map((t, tIdx) => `
                             <div class="bg-white p-4 rounded-lg shadow-sm">
                                 <div class="flex items-center justify-between">
                                     <div class="font-semibold">${getTopicDisplayName(t, idx)}：${t.title || ''}</div>
-                                    <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                                        <button class="view-topic-votes-btn px-2 py-1 text-xs sm:text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700" data-topic-id="${t.id}" data-topic-idx="${idx}">查看投票明細</button>
+                                    </div>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
                                     ${optsHtml}
@@ -2208,6 +2224,15 @@ const topicCells = currentTopics.map((t, tIdx) => `
                         `;
                     });
                     topicStatsContainer.innerHTML = html || '<div class="text-gray-500 text-sm">尚未設定議題</div>';
+                    // 綁定查看投票明細
+                    topicStatsContainer.querySelectorAll('.view-topic-votes-btn').forEach(btn => {
+                        btn.onclick = () => {
+                            const tid = btn.getAttribute('data-topic-id');
+                            const tIdx = parseInt(btn.getAttribute('data-topic-idx'), 10) || 0;
+                            const topic = (Array.isArray(currentTopics) ? currentTopics : []).find(x => x.id === tid);
+                            if (topic) openTopicVoteDetailsModal(topic, tIdx);
+                        };
+                    });
                 }
             }
             
@@ -2280,6 +2305,144 @@ const topicCells = currentTopics.map((t, tIdx) => `
                         readerPlaceholder.classList.remove('hidden');
                     });
             });
+
+            // 顯示單一議題的投票明細對話框（住戶整合視圖 + 原始逐票視圖）
+            function openTopicVoteDetailsModal(topic, topicIdx) {
+                const residentsById = {};
+                (Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : []).forEach(r => { residentsById[r.id] = r; });
+                const tvotes = (Array.isArray(currentVotes) ? currentVotes : []).filter(v => v.topicId === topic.id);
+
+                // 住戶整合：同一住戶的選項以 Set 去重，並取得最新時間與來源集合
+                const agg = new Map();
+                tvotes.forEach(v => {
+                    const rid = v.residentId;
+                    if (!agg.has(rid)) {
+                        const rr = residentsById[rid];
+                        agg.set(rid, {
+                            unit: rr?.unit || '',
+                            name: rr?.name || '',
+                            ownership: parseFloat(rr?.ownership) || 0,
+                            selections: new Set(),
+                            latestAt: 0,
+                            sources: new Set(),
+                            count: 0
+                        });
+                    }
+                    const a = agg.get(rid);
+                    a.selections.add(v.optionIndex);
+                    a.count += 1;
+                    a.sources.add(v.source || '');
+                    const ts = v.createdAt?.toMillis ? v.createdAt.toMillis() : (v.createdAt?.seconds ? v.createdAt.seconds * 1000 : 0);
+                    if (ts > a.latestAt) a.latestAt = ts;
+                });
+
+                // 排序：依單元、姓名
+                const aggRows = Array.from(agg.values()).sort((a, b) => {
+                    const ua = (a.unit || '').toString();
+                    const ub = (b.unit || '').toString();
+                    if (ua === ub) return (a.name || '').localeCompare(b.name || '');
+                    return ua.localeCompare(ub);
+                });
+
+                const optionLabelOf = (idx) => (Array.isArray(topic.options) && topic.options[idx] && topic.options[idx].label) ? topic.options[idx].label : `選項${idx + 1}`;
+                const aggTableRows = aggRows.map(r => {
+                    const labels = Array.from(r.selections).sort((x,y)=>x-y).map(optionLabelOf).join('、');
+                    const timeStr = r.latestAt ? new Date(r.latestAt).toLocaleString('zh-TW').replace(/\//g, '-') : 'N/A';
+                    const sources = Array.from(r.sources).filter(s => s).join('、');
+                    return `<tr>
+                        <td class="px-4 py-2 whitespace-nowrap">${r.unit}</td>
+                        <td class="px-4 py-2">${r.name}</td>
+                        <td class="px-4 py-2">${labels || '-'}</td>
+                        <td class="px-4 py-2 text-right">${r.ownership.toFixed(4)}%</td>
+                        <td class="px-4 py-2">${timeStr}</td>
+                        <td class="px-4 py-2">${sources || '-'}</td>
+                        <td class="px-4 py-2 text-center">${r.count}</td>
+                    </tr>`;
+                }).join('');
+
+                // 原始逐票視圖：按時間倒序
+                const rawRows = tvotes.slice().sort((a,b) => {
+                    const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
+                    const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
+                    return tb - ta;
+                }).map(v => {
+                    const rr = residentsById[v.residentId] || {};
+                    const timeStr = v.createdAt ? (v.createdAt.toMillis ? new Date(v.createdAt.toMillis()).toLocaleString('zh-TW') : new Date(v.createdAt.seconds * 1000).toLocaleString('zh-TW')) : 'N/A';
+                    const label = optionLabelOf(v.optionIndex);
+                    return `<tr>
+                        <td class="px-4 py-2 whitespace-nowrap">${rr.unit || ''}</td>
+                        <td class="px-4 py-2">${rr.name || ''}</td>
+                        <td class="px-4 py-2">${label}</td>
+                        <td class="px-4 py-2">${v.source || '-'}</td>
+                        <td class="px-4 py-2">${timeStr.replace(/\//g, '-')}</td>
+                        <td class="px-4 py-2">${v.code || ''}</td>
+                    </tr>`;
+                }).join('');
+
+                const titleText = `${getTopicDisplayName(topic, topicIdx)} 投票明細`;
+                modalTitle.textContent = titleText;
+                modalMessage.innerHTML = `
+                    <div class="space-y-4">
+                        <div class="text-sm text-gray-600">顯示此議題的投票明細。上方表格以住戶為單位整合選項；下方可切換查看原始逐票紀錄。</div>
+                        <div id="vote-agg-view">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-4 py-2 text-left">單元</th>
+                                        <th class="px-4 py-2 text-left">姓名</th>
+                                        <th class="px-4 py-2 text-left">選擇</th>
+                                        <th class="px-4 py-2 text-right">區分權</th>
+                                        <th class="px-4 py-2 text-left">最新時間</th>
+                                        <th class="px-4 py-2 text-left">來源</th>
+                                        <th class="px-4 py-2 text-center">筆數</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${aggTableRows || `<tr><td colspan="7" class="p-4 text-center text-gray-500">尚無投票</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
+                        <div id="vote-raw-view" class="hidden">
+                            <table class="min-w-full text-sm">
+                                <thead>
+                                    <tr class="bg-gray-100">
+                                        <th class="px-4 py-2 text-left">單元</th>
+                                        <th class="px-4 py-2 text-left">姓名</th>
+                                        <th class="px-4 py-2 text-left">選項</th>
+                                        <th class="px-4 py-2 text-left">來源</th>
+                                        <th class="px-4 py-2 text-left">時間</th>
+                                        <th class="px-4 py-2 text-left">投票碼</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    ${rawRows || `<tr><td colspan="6" class="p-4 text-center text-gray-500">尚無投票</td></tr>`}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                `;
+                modalButtons.innerHTML = `
+                    <button id="toggle-raw-btn" class="px-4 py-2 bg-indigo-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-indigo-700 focus:outline-none">切換原始逐票</button>
+                    <button id="modal-close-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none">關閉</button>
+                `;
+                customModal.classList.remove('hidden');
+                document.getElementById('toggle-raw-btn').onclick = () => {
+                    const aggView = document.getElementById('vote-agg-view');
+                    const rawView = document.getElementById('vote-raw-view');
+                    if (!aggView || !rawView) return;
+                    const showingRaw = !rawView.classList.contains('hidden');
+                    if (showingRaw) {
+                        rawView.classList.add('hidden');
+                        aggView.classList.remove('hidden');
+                    } else {
+                        aggView.classList.add('hidden');
+                        rawView.classList.remove('hidden');
+                    }
+                };
+                document.getElementById('modal-close-btn').onclick = () => {
+                    customModal.classList.add('hidden');
+                };
+            }
 
             stopScanBtn.addEventListener('click', stopScanner);
 
