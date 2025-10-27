@@ -1413,6 +1413,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     return;
                 }
                 const heads = ['主題','說明','提案人','投票項目','複選(票數)','操作'];
+                const canEditTopic = !!currentUser?.uid && (currentUser?.role === 'system_admin' || currentUser?.role === 'senior_manager');
                 let html = '<table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>' +
                     heads.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('') +
                     '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
@@ -1428,7 +1429,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             <td class="px-2 py-2 whitespace-nowrap truncate">${optionsText}</td>
                             <td class="px-2 py-2 whitespace-nowrap">${multiText}</td>
                             <td class="px-2 py-2 whitespace-nowrap">
-                                <button class="topic-settings-edit-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded" data-topic-index="${idx}">編輯設定</button>
+                                ${canEditTopic ? `<button class="topic-settings-edit-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded" data-topic-index="${idx}">編輯設定</button>` : `<span class="text-gray-400 text-xs">-</span>`}
                             </td>
                         </tr>
                     `;
@@ -1624,6 +1625,16 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 multiEl.onchange = () => { maxEl.disabled = !multiEl.checked; };
 
                 document.getElementById('modal-save-btn').onclick = async () => {
+                    // 先做權限檢查，避免觸發 Firestore 規則拒絕
+                    if (!currentUser?.uid) {
+                        showCustomAlert('未登入或登入狀態已失效，請重新登入。', '權限不足');
+                        return;
+                    }
+                    const canEdit = currentUser.role === 'system_admin' || currentUser.role === 'senior_manager';
+                    if (!canEdit) {
+                        showCustomAlert('您沒有更新議題設定的權限，請聯絡系統管理員。', '權限不足');
+                        return;
+                    }
                     const title = document.getElementById('edit-topic-title').value.trim();
                     const desc = document.getElementById('edit-topic-desc').value.trim();
                     const prefix = document.getElementById('edit-topic-prefix').value.trim() || '議題';
@@ -1650,7 +1661,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         showCustomAlert('議題設定已更新', '完成');
                     } catch (err) {
                         console.error('Update topic settings error:', err);
-                        showCustomAlert('更新失敗，請稍後重試', '錯誤');
+                        if (err?.code === 'permission-denied') {
+                            showCustomAlert('無權限更新議題設定，請確認登入帳號或角色。', '權限不足');
+                        } else {
+                            showCustomAlert('更新失敗，請稍後重試', '錯誤');
+                        }
                     }
                 };
                 document.getElementById('modal-cancel-btn').onclick = () => {
@@ -2342,13 +2357,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             ownership: parseFloat(rr?.ownership) || 0,
                             selections: new Set(),
                             latestAt: 0,
-                            sources: new Set(),
-                            count: 0
+                            sources: new Set()
                         });
                     }
                     const a = agg.get(rid);
                     a.selections.add(v.optionIndex);
-                    a.count += 1;
                     a.sources.add(v.source || '');
                     const ts = v.createdAt?.toMillis ? v.createdAt.toMillis() : (v.createdAt?.seconds ? v.createdAt.seconds * 1000 : 0);
                     if (ts > a.latestAt) a.latestAt = ts;
@@ -2374,16 +2387,26 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         <td class="px-4 py-2 text-right">${r.ownership.toFixed(4)}%</td>
                         <td class="px-4 py-2">${timeStr}</td>
                         <td class="px-4 py-2">${sources || '-'}</td>
-                        <td class="px-4 py-2 text-center">${r.count}</td>
+                        <td class="px-4 py-2 text-center">${r.selections.size}</td>
                     </tr>`;
                 }).join('');
 
-                // 原始逐票視圖：按時間倒序
-                const rawRows = tvotes.slice().sort((a,b) => {
+                // 原始逐票視圖：按時間倒序，並去重同住戶同選項（保留最新一筆）
+                const sortedVotes = tvotes.slice().sort((a,b) => {
                     const ta = a.createdAt?.toMillis ? a.createdAt.toMillis() : (a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0);
                     const tb = b.createdAt?.toMillis ? b.createdAt.toMillis() : (b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0);
                     return tb - ta;
-                }).map(v => {
+                });
+                const seenKeys = new Set();
+                const uniqueVotes = [];
+                sortedVotes.forEach(v => {
+                    const key = `${v.residentId}|${v.optionIndex}`;
+                    if (!seenKeys.has(key)) {
+                        seenKeys.add(key);
+                        uniqueVotes.push(v);
+                    }
+                });
+                const rawRows = uniqueVotes.map(v => {
                     const rr = residentsById[v.residentId] || {};
                     const timeStr = v.createdAt ? (v.createdAt.toMillis ? new Date(v.createdAt.toMillis()).toLocaleString('zh-TW') : new Date(v.createdAt.seconds * 1000).toLocaleString('zh-TW')) : 'N/A';
                     const label = optionLabelOf(v.optionIndex);
