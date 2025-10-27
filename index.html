@@ -2008,7 +2008,13 @@ const userDocPath = (userId) => ["users", userId];
             async function handleVoteScan(decodedText, source) {
                 if (!selectedEventId) return;
                 const now = Date.now();
-                if (now - lastVoteScanTime < 3000 && lastVotedCode === decodedText) return;
+                if (now - lastVoteScanTime < 3000 && lastVotedCode === decodedText) {
+                    const s = document.getElementById('scanvote-status');
+                    s.textContent = '重複投票：此QR Code已記錄';
+                    s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-yellow-100 text-yellow-800';
+                    speak('重複投票');
+                    return;
+                }
                 lastVoteScanTime = now;
                 lastVotedCode = decodedText;
 
@@ -2017,8 +2023,9 @@ const userDocPath = (userId) => ["users", userId];
 
                 const match = decodedText.match(/^A(\d{3})M(\d{2})([A-Z])$/);
                 if (!match) {
-                    statusEl.textContent = '無效的投票碼';
+                    statusEl.textContent = '投票失敗：無效的投票碼';
                     statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    speak('投票失敗');
                     return;
                 }
                 const residentSerial = parseInt(match[1], 10);
@@ -2029,20 +2036,35 @@ const userDocPath = (userId) => ["users", userId];
                 const resident = allResidentsForSelectedEvent[residentSerial - 1];
                 const topic = currentTopics[topicSerial - 1];
                 if (!resident || !topic || optionIndex < 0 || !Array.isArray(topic.options) || !topic.options[optionIndex]) {
-                    statusEl.textContent = '投票碼對應資料不存在';
+                    statusEl.textContent = '投票失敗：投票碼對應資料不存在';
                     statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    speak('投票失敗');
                     return;
                 }
 
                 const label = topic.options[optionIndex].label || `選項${optionIndex + 1}`;
                 const simpleTime = new Date().toLocaleTimeString('zh-TW');
-                voteList.innerHTML = `<li class=\"p-2 bg-gray-100 rounded-md\"><div><span class=\"font-bold\">${resident.unit} ${resident.name}</span> - ${simpleTime}</div><span class=\"text-sm text-gray-500 block\">投票：議題${topicSerial} - ${label}</span></li>` + voteList.innerHTML;
 
                 showLoader();
                 const eventRef = doc(db, ...eventDocPath(selectedEventId));
                 try {
                     const snap = await getDoc(eventRef);
                     const prev = (snap.exists() && Array.isArray(snap.data().votes)) ? snap.data().votes : [];
+                    // 1) 同一QR Code只能記錄一次
+                    if (prev.some(v => v.code === decodedText)) {
+                        statusEl.textContent = '重複投票：此QR Code已記錄';
+                        statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-yellow-100 text-yellow-800';
+                        speak('重複投票');
+                        return;
+                    }
+                    // 2) 若該議題未勾選複選，限制每位住戶對該議題只能投一次
+                    if (!topic.multiSelect && prev.some(v => v.topicId === topic.id && v.residentId === resident.id)) {
+                        statusEl.textContent = '已於該議題投票：不可重覆選擇';
+                        statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-yellow-100 text-yellow-800';
+                        speak('已於該議題投票');
+                        return;
+                    }
+
                     const vote = {
                         residentId: resident.id,
                         unit: resident.unit,
@@ -2059,10 +2081,16 @@ const userDocPath = (userId) => ["users", userId];
                     await updateDoc(eventRef, { votes: [...prev, vote] });
                     statusEl.textContent = `投票成功：${resident.unit} ${resident.name} → 議題${topicSerial}「${label}」`;
                     statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-green-100 text-green-800';
+                    speak('投票成功');
+                    voteList.innerHTML = `<li class=\"p-2 bg-gray-100 rounded-md\"><div><span class=\"font-bold\">${resident.unit} ${resident.name}</span> - ${simpleTime}</div><span class=\"text-sm text-gray-500 block\">投票：議題${topicSerial} - ${label}</span></li>` + voteList.innerHTML;
+                    // 本地快取與儀表板即時更新
+                    try { currentVotes.push(vote); } catch (_) {}
+                    updateDashboardCalculations();
                 } catch (err) {
                     console.error('Vote persist error:', err);
-                    statusEl.textContent = '投票儲存失敗';
+                    statusEl.textContent = '投票失敗：儲存錯誤';
                     statusEl.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                    speak('投票失敗');
                 } finally {
                     hideLoader();
                 }
