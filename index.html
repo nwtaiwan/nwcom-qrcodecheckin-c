@@ -835,7 +835,7 @@ const userDocPath = (userId) => ["users", userId];
 
             async function showResetVotesDialog() {
                 const hasTopics = Array.isArray(currentTopics) && currentTopics.length > 0;
-                const topicOptions = hasTopics ? currentTopics.map((t, idx) => `<option value="${t.id}">議題${idx + 1} - ${t.title || ''}</option>`).join('') : '';
+                const topicOptions = hasTopics ? currentTopics.map((t, idx) => `<option value="${t.id}">${getTopicDisplayName(t, idx)} - ${t.title || ''}</option>`).join('') : '';
                 modalTitle.textContent = '重設投票紀錄';
                 modalMessage.innerHTML = `
                     <div class="space-y-3">
@@ -1325,7 +1325,7 @@ const userDocPath = (userId) => ["users", userId];
 
             function renderTopicsTable() {
                 const fixedHead = ['狀態','序號','戶號','姓名','坪數','區分權(%)'];
-                const topicHeads = currentTopics.map((t, i) => `議題${i+1}投票`);
+                const topicHeads = currentTopics.map((t, i) => `${getTopicDisplayName(t, i)}投票`);
                 const headHtml = `
                     <tr>
                         ${fixedHead.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
@@ -1344,7 +1344,11 @@ const userDocPath = (userId) => ["users", userId];
                     const canVote = !!resident.isCheckedIn;
 const topicCells = currentTopics.map((t, tIdx) => `
     <td class="px-4 py-2 text-center">
-        <button class="topic-vote-btn ${canVote ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button>
+        <div class="flex flex-col items-center gap-1">
+            <button class="topic-vote-btn ${canVote ? 'bg-green-600 hover:bg-green-700' : 'bg-gray-400 cursor-not-allowed'} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">投票</button>
+            <button class="topic-edit-btn ${canVote ? 'bg-blue-600 hover:bg-blue-700' : 'bg-gray-400 cursor-not-allowed'} text-white text-xs px-2 py-1 rounded" ${canVote ? '' : 'disabled'} data-resident-index="${idx}" data-topic-index="${tIdx}">編輯</button>
+            <button class="topic-reset-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded" data-resident-index="${idx}" data-topic-index="${tIdx}">重設</button>
+        </div>
     </td>
 `).join('');
                     tr.innerHTML = `
@@ -1361,10 +1365,22 @@ const topicCells = currentTopics.map((t, tIdx) => `
                     `;
                     topicsTableBody.appendChild(tr);
                     currentTopics.forEach((t, tIdx) => {
-                        const btn = tr.querySelector(`.topic-vote-btn[data-topic-index="${tIdx}"]`);
-                        if (btn) {
-                            btn.addEventListener('click', () => {
+                        const voteBtn = tr.querySelector(`.topic-vote-btn[data-topic-index="${tIdx}"]`);
+                        if (voteBtn) {
+                            voteBtn.addEventListener('click', () => {
                                 showTopicVoteModal(resident, t, tIdx, idx);
+                            });
+                        }
+                        const editBtn = tr.querySelector(`.topic-edit-btn[data-topic-index="${tIdx}"]`);
+                        if (editBtn) {
+                            editBtn.addEventListener('click', () => {
+                                openResidentTopicVoteEditModal(resident, t, tIdx, idx);
+                            });
+                        }
+                        const resetBtn = tr.querySelector(`.topic-reset-btn[data-topic-index="${tIdx}"]`);
+                        if (resetBtn) {
+                            resetBtn.addEventListener('click', () => {
+                                resetResidentTopicVoteForResident(resident, t, tIdx, idx);
                             });
                         }
                     });
@@ -1391,11 +1407,11 @@ const topicCells = currentTopics.map((t, tIdx) => `
                     container.innerHTML = '<div class="text-gray-500 text-sm p-3">尚未新增議題</div>';
                     return;
                 }
-                const heads = ['主題','說明','提案人','投票項目','複選(票數)'];
+                const heads = ['主題','說明','提案人','投票項目','複選(票數)','操作'];
                 let html = '<table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>' +
                     heads.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('') +
                     '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
-                currentTopics.forEach(t => {
+                currentTopics.forEach((t, idx) => {
                     const proposerText = t?.proposer?.type === 'resident' ? `住戶(${t?.proposer?.unit || ''})` : '管委會';
                     const optionsText = Array.isArray(t.options) ? t.options.map(o => o.label).join('、') : '';
                     const multiText = t.multiSelect ? `是(${t.maxSelections || 1})` : '否(1)';
@@ -1406,11 +1422,235 @@ const topicCells = currentTopics.map((t, tIdx) => `
                             <td class="px-2 py-2 whitespace-nowrap">${proposerText}</td>
                             <td class="px-2 py-2 whitespace-nowrap truncate">${optionsText}</td>
                             <td class="px-2 py-2 whitespace-nowrap">${multiText}</td>
+                            <td class="px-2 py-2 whitespace-nowrap">
+                                <button class="topic-settings-edit-btn bg-blue-600 hover:bg-blue-700 text-white text-xs px-2 py-1 rounded" data-topic-index="${idx}">編輯設定</button>
+                            </td>
                         </tr>
                     `;
                 });
                 html += '</tbody></table>';
                 container.innerHTML = html;
+                // 綁定設定編輯按鈕
+                Array.from(container.querySelectorAll('.topic-settings-edit-btn')).forEach(btn => {
+                    btn.addEventListener('click', (e) => {
+                        const tIdx = parseInt(e.currentTarget.getAttribute('data-topic-index'), 10);
+                        const topic = currentTopics[tIdx];
+                        if (topic) openTopicSettingsEditModal(topic, tIdx);
+                    });
+                });
+            }
+
+            // 編輯住戶針對單一議題的投票選擇
+            async function openResidentTopicVoteEditModal(resident, topic, topicIdx, residentIdx) {
+                if (!resident?.isCheckedIn) {
+                    showCustomAlert('尚未報到不可編輯投票', '限制');
+                    return;
+                }
+                const existing = Array.isArray(currentVotes) ? currentVotes.filter(v => v.residentId === resident.id && v.topicId === topic.id) : [];
+                const preselected = existing.map(v => v.optionIndex);
+                const optionsHtml = (Array.isArray(topic.options) ? topic.options : []).map((opt, idx) => {
+                    const checked = preselected.includes(idx) ? 'checked' : '';
+                    const inputType = topic.multiSelect ? 'checkbox' : 'radio';
+                    const nameAttr = topic.multiSelect ? `name="edit-opt-${resident.id}-${topic.id}-${idx}"` : `name="edit-opt-group"`;
+                    return `<label class="flex items-center gap-2"><input type="${inputType}" ${nameAttr} value="${idx}" ${checked}> ${opt.label || `選項${idx+1}`}</label>`;
+                }).join('');
+
+                const titleText = `${getTopicDisplayName(topic, topicIdx)} 投票編輯 - ${resident.unit || ''} ${resident.name || ''}`;
+                modalTitle.textContent = titleText;
+                modalMessage.innerHTML = `
+                    <div class="space-y-3">
+                        <div class="text-sm text-gray-600">${topic.description || ''}</div>
+                        <div class="space-y-2" id="edit-options-wrap">${optionsHtml || '<div class="text-sm text-gray-500">此議題尚無選項</div>'}</div>
+                        ${topic.multiSelect ? `<div class="text-xs text-gray-500">最多可選 ${topic.maxSelections || 1} 項</div>` : ''}
+                    </div>
+                `;
+                modalButtons.innerHTML = `
+                    <button id="modal-save-btn" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none">儲存</button>
+                    <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none">取消</button>
+                `;
+                customModal.classList.remove('hidden');
+
+                document.getElementById('modal-save-btn').onclick = async () => {
+                    const wrap = document.getElementById('edit-options-wrap');
+                    if (!wrap) return;
+                    let selectedIndices = [];
+                    if (topic.multiSelect) {
+                        selectedIndices = Array.from(wrap.querySelectorAll('input[type="checkbox"]:checked')).map(i => parseInt(i.value, 10));
+                        const max = topic.maxSelections || 1;
+                        if (selectedIndices.length === 0) { showCustomAlert('請至少選擇一項'); return; }
+                        if (selectedIndices.length > max) { showCustomAlert(`超過可選數量（最多 ${max} 項）`); return; }
+                    } else {
+                        const checked = wrap.querySelector('input[type="radio"]:checked');
+                        if (!checked) { showCustomAlert('請選擇一項'); return; }
+                        selectedIndices = [parseInt(checked.value, 10)];
+                    }
+                    customModal.classList.add('hidden');
+                    await persistResidentTopicVotes(resident, topic, topicIdx, residentIdx, selectedIndices);
+                };
+                document.getElementById('modal-cancel-btn').onclick = () => {
+                    customModal.classList.add('hidden');
+                };
+            }
+
+            async function persistResidentTopicVotes(resident, topic, topicIdx, residentIdx, selectedOptionIndices) {
+                showLoader();
+                try {
+                    const eventRef = doc(db, ...eventDocPath(selectedEventId));
+                    const snap = await getDoc(eventRef);
+                    const prev = (snap.exists() && Array.isArray(snap.data().votes)) ? snap.data().votes : [];
+                    // 移除該住戶在該議題的既有投票
+                    const filtered = prev.filter(v => !(v.residentId === resident.id && v.topicId === topic.id));
+                    const topicSerial = topicIdx + 1;
+                    const newVotes = selectedOptionIndices.map(optIdx => {
+                        const label = (topic.options && topic.options[optIdx] && topic.options[optIdx].label) ? topic.options[optIdx].label : `選項${optIdx + 1}`;
+                        const code = buildVoteCode(residentIdx + 1, topicSerial, optIdx);
+                        return {
+                            residentId: resident.id,
+                            unit: resident.unit,
+                            name: resident.name,
+                            topicId: topic.id,
+                            topicSerial,
+                            optionIndex: optIdx,
+                            optionLabel: label,
+                            code,
+                            createdAt: Timestamp.now(),
+                            source: '管理編輯',
+                            createdBy: currentUser.name
+                        };
+                    });
+                    await updateDoc(eventRef, { votes: [...filtered, ...newVotes] });
+                    // 更新本地快取
+                    currentVotes = [...filtered, ...newVotes];
+                    updateDashboardCalculations();
+                    showCustomAlert('已更新該住戶的投票選擇', '完成');
+                } catch (err) {
+                    console.error('Edit votes persist error:', err);
+                    showCustomAlert('儲存失敗，請稍後再試', '錯誤');
+                } finally {
+                    hideLoader();
+                }
+            }
+
+            async function resetResidentTopicVoteForResident(resident, topic, topicIdx, residentIdx) {
+                const ok = await showCustomConfirm(`確定重設 ${resident.unit || ''} ${resident.name || ''} 在「${getTopicDisplayName(topic, topicIdx)}」的投票？`, '重設確認');
+                if (!ok) return;
+                showLoader();
+                try {
+                    const eventRef = doc(db, ...eventDocPath(selectedEventId));
+                    const snap = await getDoc(eventRef);
+                    const prev = (snap.exists() && Array.isArray(snap.data().votes)) ? snap.data().votes : [];
+                    const filtered = prev.filter(v => !(v.residentId === resident.id && v.topicId === topic.id));
+                    await updateDoc(eventRef, { votes: filtered });
+                    currentVotes = filtered;
+                    updateDashboardCalculations();
+                    showCustomAlert('已重設該住戶在此議題的投票', '完成');
+                } catch (err) {
+                    console.error('Reset votes error:', err);
+                    showCustomAlert('重設失敗，請稍後再試', '錯誤');
+                } finally {
+                    hideLoader();
+                }
+            }
+
+            // 議題設定編輯：可調整標題、說明、前綴/編號文字、選項增刪、複選上限
+            async function openTopicSettingsEditModal(topic, topicIdx) {
+                const options = Array.isArray(topic.options) ? topic.options : [];
+                const optRows = options.map((opt, idx) => `
+                    <div class="flex items-center gap-2 mb-2">
+                        <input type="text" class="flex-1 px-2 py-1 border border-gray-300 rounded" value="${opt.label || ''}" data-opt-index="${idx}">
+                        <button class="remove-opt-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded" data-opt-index="${idx}">刪除</button>
+                    </div>
+                `).join('');
+                modalTitle.textContent = `編輯設定 - ${getTopicDisplayName(topic, topicIdx)}`;
+                modalMessage.innerHTML = `
+                    <div class="space-y-3">
+                        <label class="block text-sm">議題名稱</label>
+                        <input id="edit-topic-title" type="text" class="w-full px-3 py-2 border border-gray-300 rounded" value="${topic.title || ''}">
+                        <label class="block text-sm">說明</label>
+                        <textarea id="edit-topic-desc" class="w-full px-3 py-2 border border-gray-300 rounded">${topic.description || ''}</textarea>
+                        <div class="grid grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm">名稱前綴</label>
+                                <input id="edit-topic-prefix" type="text" class="w-full px-3 py-2 border border-gray-300 rounded" value="${topic.labelPrefix || '議題'}">
+                            </div>
+                            <div>
+                                <label class="block text-sm">編號文字</label>
+                                <input id="edit-topic-serial" type="text" class="w-full px-3 py-2 border border-gray-300 rounded" value="${topic.serialText || (topicIdx + 1)}">
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm">投票項目</label>
+                            <div id="edit-options-list">${optRows || '<div class="text-sm text-gray-500">尚無項目</div>'}</div>
+                            <button id="add-opt-btn" class="mt-2 bg-green-600 hover:bg-green-700 text-white text-xs px-2 py-1 rounded">新增項目</button>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <label class="flex items-center gap-2"><input type="checkbox" id="edit-multi" ${topic.multiSelect ? 'checked' : ''}> 複選</label>
+                            <input id="edit-max" type="number" min="1" class="w-24 px-2 py-1 border border-gray-300 rounded" value="${topic.maxSelections || 1}" ${topic.multiSelect ? '' : 'disabled'}>
+                        </div>
+                    </div>
+                `;
+                modalButtons.innerHTML = `
+                    <button id="modal-save-btn" class="px-4 py-2 bg-blue-600 text-white text-base font-medium rounded-md w-auto shadow-sm hover:bg-blue-700 focus:outline-none">儲存</button>
+                    <button id="modal-cancel-btn" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-auto shadow-sm hover:bg-gray-300 focus:outline-none">取消</button>
+                `;
+                customModal.classList.remove('hidden');
+
+                // 互動邏輯
+                const listEl = document.getElementById('edit-options-list');
+                document.getElementById('add-opt-btn').onclick = () => {
+                    const row = document.createElement('div');
+                    row.className = 'flex items-center gap-2 mb-2';
+                    const idx = listEl.querySelectorAll('input[type="text"]').length;
+                    row.innerHTML = `<input type="text" class="flex-1 px-2 py-1 border border-gray-300 rounded" value="" data-opt-index="${idx}"><button class="remove-opt-btn bg-red-600 hover:bg-red-700 text-white text-xs px-2 py-1 rounded" data-opt-index="${idx}">刪除</button>`;
+                    listEl.appendChild(row);
+                    bindRemoveHandlers();
+                };
+                function bindRemoveHandlers() {
+                    Array.from(listEl.querySelectorAll('.remove-opt-btn')).forEach(btn => {
+                        btn.onclick = () => {
+                            const parent = btn.parentElement;
+                            parent?.remove();
+                        };
+                    });
+                }
+                bindRemoveHandlers();
+                const multiEl = document.getElementById('edit-multi');
+                const maxEl = document.getElementById('edit-max');
+                multiEl.onchange = () => { maxEl.disabled = !multiEl.checked; };
+
+                document.getElementById('modal-save-btn').onclick = async () => {
+                    const title = document.getElementById('edit-topic-title').value.trim();
+                    const desc = document.getElementById('edit-topic-desc').value.trim();
+                    const prefix = document.getElementById('edit-topic-prefix').value.trim() || '議題';
+                    const serialText = document.getElementById('edit-topic-serial').value.trim() || String(topicIdx + 1);
+                    const optLabels = Array.from(listEl.querySelectorAll('input[type="text"]')).map(i => i.value.trim()).filter(s => s.length > 0);
+                    const multi = multiEl.checked;
+                    const maxSel = parseInt(maxEl.value, 10) || 1;
+                    if (optLabels.length === 0) { showCustomAlert('請至少保留一個投票項目'); return; }
+
+                    const eventId = selectedEventId;
+                    const topicRef = doc(db, ...topicDocPath(eventId, topic.id));
+                    const payload = {
+                        title,
+                        description: desc,
+                        labelPrefix: prefix,
+                        serialText,
+                        options: optLabels.map(l => ({ label: l })),
+                        multiSelect: multi,
+                        maxSelections: multi ? maxSel : 1
+                    };
+                    try {
+                        await updateDoc(topicRef, payload);
+                        customModal.classList.add('hidden');
+                        showCustomAlert('議題設定已更新', '完成');
+                    } catch (err) {
+                        console.error('Update topic settings error:', err);
+                        showCustomAlert('更新失敗，請稍後重試', '錯誤');
+                    }
+                };
+                document.getElementById('modal-cancel-btn').onclick = () => {
+                    customModal.classList.add('hidden');
+                };
             }
 
             async function showTopicForm(initial = null) {
@@ -1581,6 +1821,13 @@ const topicCells = currentTopics.map((t, tIdx) => `
                 return -1;
             }
 
+            // 顯示用的議題名稱（可自訂前綴與編號文字）
+            function getTopicDisplayName(topic, idx) {
+                const prefix = topic?.labelPrefix || '議題';
+                const serial = topic?.serialText || (idx + 1);
+                return `${prefix}${serial}`;
+            }
+
             function showTopicVoteModal(resident, topic, topicIdx, residentIdx) {
     // 僅限已報到住戶可投票
     if (!resident?.isCheckedIn) {
@@ -1591,7 +1838,7 @@ const topicCells = currentTopics.map((t, tIdx) => `
                 const proposerText = topic?.proposer?.type === 'resident' ? `住戶(${topic?.proposer?.unit || ''})` : '管委會';
                 const options = Array.isArray(topic.options) ? topic.options : [];
 
-                modalTitle.textContent = `議題${topicIdx + 1}`;
+                modalTitle.textContent = getTopicDisplayName(topic, topicIdx);
                 modalMessage.innerHTML = `
                     <div class="space-y-3">
                         <div><span class="font-semibold">主題：</span>${topic.title || ''}</div>
@@ -1951,7 +2198,7 @@ const topicCells = currentTopics.map((t, tIdx) => `
                         html += `
                             <div class="bg-white p-4 rounded-lg shadow-sm">
                                 <div class="flex items-center justify-between">
-                                    <div class="font-semibold">議題${idx + 1}：${t.title || ''}</div>
+                                    <div class="font-semibold">${getTopicDisplayName(t, idx)}：${t.title || ''}</div>
                                     <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
