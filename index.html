@@ -1645,7 +1645,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     if (optLabels.length === 0) { showCustomAlert('請至少保留一個投票項目'); return; }
 
                     const eventId = selectedEventId;
-                    const topicRef = doc(db, ...topicDocPath(eventId, topic.id));
+                    const eventRef = doc(db, ...eventDocPath(eventId));
                     const payload = {
                         title,
                         description: desc,
@@ -1656,7 +1656,19 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         maxSelections: multi ? maxSel : 1
                     };
                     try {
-                        await updateDoc(topicRef, payload);
+                        const snap = await getDoc(eventRef);
+                        if (!snap.exists()) {
+                            showCustomAlert('找不到活動資料，請重新載入。', '錯誤');
+                            return;
+                        }
+                        const prevTopics = Array.isArray(snap.data().topics) ? snap.data().topics : [];
+                        const newTopics = prevTopics.map(t => {
+                            if (t.id === topic.id) {
+                                return { ...t, ...payload };
+                            }
+                            return t;
+                        });
+                        await updateDoc(eventRef, { topics: newTopics });
                         customModal.classList.add('hidden');
                         showCustomAlert('議題設定已更新', '完成');
                     } catch (err) {
