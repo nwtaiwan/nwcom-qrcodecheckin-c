@@ -420,7 +420,7 @@
                          </div>
                          <div class="mb-4">
                              <h4 class="font-semibold">議題設定</h4>
-                             <div id="topics-meta-list" class="mt-2 border rounded-md"></div>
+                             <div id="topics-meta-list" class="mt-2 border rounded-md overflow-x-auto"></div>
                          </div>
                          <div class="overflow-auto max-h-[70vh]">
                              <table class="min-w-full divide-y divide-gray-200" style="table-layout: fixed;">
@@ -1614,7 +1614,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 }
                 const heads = ['議題名稱','主題','說明','提案人','投票項目','複選(票數)','操作'];
                 const canEditTopic = !!currentUser?.uid && (currentUser?.role === 'system_admin' || currentUser?.role === 'senior_manager');
-                let html = '<table class="min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>' +
+                let html = '<table class="min-w-[960px] md:min-w-full divide-y divide-gray-200"><thead class="bg-gray-50"><tr>' +
                     heads.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('') +
                     '</tr></thead><tbody class="bg-white divide-y divide-gray-200">';
                 currentTopics.forEach((t, idx) => {
