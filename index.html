@@ -3618,8 +3618,17 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     return;
                 }
 
+                const mode = window.publicVoteViewMode === 'tabs' ? 'tabs' : 'list';
                 let html = '';
-                topics.forEach((t, idx) => {
+
+                if (mode === 'tabs') {
+                    const selectedIdx = Math.min(Math.max(parseInt(window.publicTopicIndex || 0, 10), 0), topics.length - 1);
+                    const tabsHtml = topics.map((t, idx) => {
+                        const active = idx === selectedIdx ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700';
+                        return `<button class="public-topic-tab px-3 py-1 rounded-md text-sm ${active}" data-idx="${idx}">${getTopicDisplayNamePublic(t, idx)}</button>`;
+                    }).join(' ');
+
+                    const t = topics[selectedIdx];
                     const tvotes = votes.filter(v => v.topicId === t.id);
                     const selectionByResident = new Map();
                     tvotes.forEach(v => {
@@ -3645,15 +3654,25 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         return `
                             <div class="${highlight} rounded-md p-3">
                                 <div class="font-semibold">${s.label}</div>
-                                <div class="text-sm text-gray-600">票數：${s.count}</div>
+                                <div class="text-sm text-gray-600">投票人數：${s.count}</div>
                                 <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
                             </div>
                         `;
                     }).join('');
-                    html += `
+
+                    const proposerText = t?.proposer?.type === 'resident' ? `住戶(${t?.proposer?.unit || ''})` : '管委會';
+                    const displayName = getTopicDisplayNamePublic(t, selectedIdx);
+                    html = `
+                        <div class="flex justify-between items-center mb-3">
+                            <div class="flex flex-wrap gap-2">${tabsHtml}</div>
+                            <button id="toggle-public-view-mode" class="px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded">切換為列表</button>
+                        </div>
                         <div class="bg-white p-4 rounded-lg shadow-sm">
+                            <div class="font-semibold mb-2">議題名稱：${displayName}</div>
+                            <div class="text-sm text-gray-700 mb-1">主旨：${t.title || ''}</div>
+                            <div class="text-sm text-gray-700 mb-1">說明：${t.description || '-'}</div>
+                            <div class="text-sm text-gray-700 mb-3">提案人：${proposerText}</div>
                             <div class="flex items-center justify-between">
-                                <div class="font-semibold">${getTopicDisplayNamePublic(t, idx)}：${t.title || ''}</div>
                                 <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
                             </div>
                             <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
@@ -3661,9 +3680,76 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             </div>
                         </div>
                     `;
-                });
+                } else {
+                    // 列表模式：原本的全部議題一併呈現，加入切換控制與議題資訊
+                    html += `<div class="flex justify-end mb-3"><button id=\"toggle-public-view-mode\" class=\"px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded\">切換為分頁</button></div>`;
+                    topics.forEach((t, idx) => {
+                        const tvotes = votes.filter(v => v.topicId === t.id);
+                        const selectionByResident = new Map();
+                        tvotes.forEach(v => {
+                            if (!selectionByResident.has(v.residentId)) selectionByResident.set(v.residentId, new Set());
+                            selectionByResident.get(v.residentId).add(v.optionIndex);
+                        });
+                        const optionStats = (Array.isArray(t.options) ? t.options : []).map((opt, optIdx) => {
+                            let count = 0;
+                            let ownershipSum = 0;
+                            selectionByResident.forEach((set, rid) => {
+                                if (set.has(optIdx)) {
+                                    count++;
+                                    const rr = residentsById[rid];
+                                    ownershipSum += parseFloat(rr?.ownership) || 0;
+                                }
+                            });
+                            return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
+                        });
+                        const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                        const optsHtml = optionStats.map(s => {
+                            const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
+                            const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
+                            return `
+                                <div class="${highlight} rounded-md p-3">
+                                    <div class="font-semibold">${s.label}</div>
+                                    <div class="text-sm text-gray-600">投票人數：${s.count}</div>
+                                    <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
+                                </div>
+                            `;
+                        }).join('');
+                        const proposerText = t?.proposer?.type === 'resident' ? `住戶(${t?.proposer?.unit || ''})` : '管委會';
+                        const displayName = getTopicDisplayNamePublic(t, idx);
+                        html += `
+                            <div class="bg-white p-4 rounded-lg shadow-sm">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <div class="font-semibold">${displayName}</div>
+                                        <div class="text-sm text-gray-700">主旨：${t.title || ''}</div>
+                                        <div class="text-sm text-gray-700">說明：${t.description || '-'}</div>
+                                        <div class="text-sm text-gray-700">提案人：${proposerText}</div>
+                                    </div>
+                                    <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                                </div>
+                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                                    ${optsHtml}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
 
                 publicDashboardContent.innerHTML = html;
+                const toggleBtn = publicDashboardContent.querySelector('#toggle-public-view-mode');
+                if (toggleBtn) {
+                    toggleBtn.addEventListener('click', () => {
+                        window.publicVoteViewMode = (mode === 'tabs') ? 'list' : 'tabs';
+                        renderPublicVoteDashboard(eventData, residentsData);
+                    });
+                }
+                publicDashboardContent.querySelectorAll('.public-topic-tab').forEach(btn => {
+                    btn.addEventListener('click', () => {
+                        const idx = parseInt(btn.getAttribute('data-idx'), 10) || 0;
+                        window.publicTopicIndex = idx;
+                        renderPublicVoteDashboard(eventData, residentsData);
+                    });
+                });
             }
         }
     </script>
