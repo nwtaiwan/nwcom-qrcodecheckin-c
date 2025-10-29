@@ -154,6 +154,48 @@
                 </div>
                 <button type="submit" class="w-full bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition duration-150 ease-in-out">登入</button>
             </form>
+            <div class="mt-4">
+                <button id="ongoing-events-btn" class="w-full bg-blue-600 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 transition duration-150 ease-in-out">進行中活動</button>
+            </div>
+        </div>
+        
+        <!-- Ongoing Events View -->
+        <div id="ongoing-events-view" class="hidden max-w-4xl mx-auto mt-10">
+            <div class="bg-white p-8 rounded-xl shadow-lg">
+                <div class="flex justify-between items-center mb-6">
+                    <h1 class="text-2xl font-bold text-gray-900">進行中活動</h1>
+                    <button id="back-to-login-btn" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-150 ease-in-out">返回登入</button>
+                </div>
+                <div id="ongoing-events-list" class="space-y-4">
+                    <!-- 當日進行中的活動按鈕將在這裡動態生成 -->
+                </div>
+                <div id="no-ongoing-events" class="hidden text-center py-8 text-gray-500">
+                    <p>今日沒有進行中的活動</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Event Dashboard View -->
+        <div id="event-dashboard-view" class="hidden max-w-4xl mx-auto mt-10">
+            <div class="bg-white p-8 rounded-xl shadow-lg">
+                <div class="flex justify-between items-center mb-6">
+                    <div>
+                        <h1 id="dashboard-event-title" class="text-2xl font-bold text-gray-900"></h1>
+                        <p id="dashboard-event-subtitle" class="text-gray-600"></p>
+                    </div>
+                    <button id="back-to-ongoing-events-btn" class="bg-gray-500 text-white px-4 py-2 rounded-md hover:bg-gray-600 transition duration-150 ease-in-out">返回活動列表</button>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <button id="checkin-dashboard-btn" class="bg-green-600 text-white p-6 rounded-lg hover:bg-green-700 transition duration-150 ease-in-out">
+                        <h3 class="text-xl font-bold mb-2">報到狀況</h3>
+                        <p class="text-green-100">查看活動報到情況</p>
+                    </button>
+                    <button id="vote-dashboard-btn" class="bg-purple-600 text-white p-6 rounded-lg hover:bg-purple-700 transition duration-150 ease-in-out">
+                        <h3 class="text-xl font-bold mb-2">投票狀況</h3>
+                        <p class="text-purple-100">查看活動投票情況</p>
+                    </button>
+                </div>
+            </div>
         </div>
         
         <!-- Event Selection View -->
@@ -741,6 +783,8 @@ const userDocPath = (userId) => ["users", userId];
         function initializeAppPrivate() {
             // --- DOM Elements ---
             const loginView = document.getElementById('login-view');
+            const ongoingEventsView = document.getElementById('ongoing-events-view');
+            const eventDashboardView = document.getElementById('event-dashboard-view');
             const eventSelectionView = document.getElementById('event-selection-view');
             const eventDetailsView = document.getElementById('event-details-view');
             const userManagementView = document.getElementById('user-management-view');
@@ -962,6 +1006,49 @@ const userDocPath = (userId) => ["users", userId];
                 }
             });
 
+            // --- Ongoing Events Functionality ---
+            document.getElementById('ongoing-events-btn').addEventListener('click', async () => {
+                showLoader();
+                try {
+                    await showOngoingEventsView();
+                } catch (error) {
+                    console.error("Error loading ongoing events:", error);
+                    showCustomAlert('載入進行中活動時發生錯誤');
+                } finally {
+                    hideLoader();
+                }
+            });
+
+            document.getElementById('back-to-login-btn').addEventListener('click', () => {
+                showLoginView();
+            });
+
+            document.getElementById('back-to-ongoing-events-btn').addEventListener('click', async () => {
+                showLoader();
+                try {
+                    await showOngoingEventsView();
+                } catch (error) {
+                    console.error("Error loading ongoing events:", error);
+                    showCustomAlert('載入進行中活動時發生錯誤');
+                } finally {
+                    hideLoader();
+                }
+            });
+
+            document.getElementById('checkin-dashboard-btn').addEventListener('click', () => {
+                if (selectedEventId) {
+                    const checkinUrl = `${window.location.origin}${window.location.pathname}?view=public&event=${selectedEventId}`;
+                    window.open(checkinUrl, '_blank');
+                }
+            });
+
+            document.getElementById('vote-dashboard-btn').addEventListener('click', () => {
+                if (selectedEventId) {
+                    const voteUrl = `${window.location.origin}${window.location.pathname}?view=public&target=vote&event=${selectedEventId}`;
+                    window.open(voteUrl, '_blank');
+                }
+            });
+
             const handleLogout = async () => {
                 if (currentUser && currentUser.uid) {
                     const userRef = doc(db, 'users', currentUser.uid);
@@ -1101,6 +1188,40 @@ const userDocPath = (userId) => ["users", userId];
                 eventSelectionView.classList.add('hidden');
                 eventDetailsView.classList.add('hidden');
                 userManagementView.classList.remove('hidden');
+            }
+
+            function showLoginView() {
+                loginView.classList.remove('hidden');
+                ongoingEventsView.classList.add('hidden');
+                eventDashboardView.classList.add('hidden');
+                eventSelectionView.classList.add('hidden');
+                eventDetailsView.classList.add('hidden');
+                userManagementView.classList.add('hidden');
+            }
+
+            async function showOngoingEventsView() {
+                loginView.classList.add('hidden');
+                eventDashboardView.classList.add('hidden');
+                eventSelectionView.classList.add('hidden');
+                eventDetailsView.classList.add('hidden');
+                userManagementView.classList.add('hidden');
+                ongoingEventsView.classList.remove('hidden');
+                
+                await loadOngoingEvents();
+            }
+
+            function showEventDashboardView(eventId, eventData) {
+                selectedEventId = eventId;
+                ongoingEventsView.classList.add('hidden');
+                loginView.classList.add('hidden');
+                eventSelectionView.classList.add('hidden');
+                eventDetailsView.classList.add('hidden');
+                userManagementView.classList.add('hidden');
+                eventDashboardView.classList.remove('hidden');
+                
+                // 更新活動標題和副標題
+                document.getElementById('dashboard-event-title').textContent = eventData.communityName;
+                document.getElementById('dashboard-event-subtitle').textContent = `${eventData.eventName} - ${new Date(eventData.eventDate).toLocaleDateString('zh-TW')}`;
             }
             
             userManagementBtn.addEventListener('click', showUserManagementView);
@@ -1251,6 +1372,86 @@ const userDocPath = (userId) => ["users", userId];
                     hideLoader();
                 }
             });
+
+            // --- Ongoing Events Logic ---
+            async function loadOngoingEvents() {
+                const ongoingEventsList = document.getElementById('ongoing-events-list');
+                const noOngoingEvents = document.getElementById('no-ongoing-events');
+                
+                try {
+                    const eventsRef = collection(db, ...eventsCollectionPath());
+                    const snapshot = await getDocs(eventsRef);
+                    
+                    const today = new Date();
+                    const todayStr = today.toISOString().split('T')[0]; // YYYY-MM-DD format
+                    
+                    const ongoingEvents = [];
+                    snapshot.forEach(doc => {
+                        const eventData = doc.data();
+                        const eventDate = eventData.eventDate ? eventData.eventDate.split('T')[0] : null;
+                        
+                        // 檢查是否為當日活動
+                        if (eventDate === todayStr) {
+                            ongoingEvents.push({ id: doc.id, ...eventData });
+                        }
+                    });
+                    
+                    ongoingEventsList.innerHTML = '';
+                    
+                    if (ongoingEvents.length === 0) {
+                        noOngoingEvents.classList.remove('hidden');
+                        return;
+                    }
+                    
+                    noOngoingEvents.classList.add('hidden');
+                    
+                    // 按時間排序
+                    ongoingEvents.sort((a, b) => {
+                        const timeA = a.eventDate ? new Date(a.eventDate).getTime() : 0;
+                        const timeB = b.eventDate ? new Date(b.eventDate).getTime() : 0;
+                        return timeA - timeB;
+                    });
+                    
+                    ongoingEvents.forEach(event => {
+                        const eventButton = document.createElement('button');
+                        eventButton.className = 'w-full p-6 bg-blue-50 border-2 border-blue-200 rounded-lg hover:bg-blue-100 hover:border-blue-300 transition duration-150 ease-in-out text-left';
+                        
+                        const formattedDateTime = event.eventDate ? 
+                            new Date(event.eventDate).toLocaleString('zh-TW', {
+                                year: 'numeric',
+                                month: '2-digit',
+                                day: '2-digit',
+                                hour: '2-digit',
+                                minute: '2-digit'
+                            }) : '無日期';
+                        
+                        eventButton.innerHTML = `
+                            <div class="flex justify-between items-start">
+                                <div>
+                                    <h3 class="text-xl font-bold text-blue-900 mb-2">${event.communityName}</h3>
+                                    <p class="text-lg text-blue-700 mb-2">${event.eventName}</p>
+                                    <p class="text-sm text-blue-600">${formattedDateTime}</p>
+                                </div>
+                                <div class="text-blue-500">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
+                                    </svg>
+                                </div>
+                            </div>
+                        `;
+                        
+                        eventButton.addEventListener('click', () => {
+                            showEventDashboardView(event.id, event);
+                        });
+                        
+                        ongoingEventsList.appendChild(eventButton);
+                    });
+                    
+                } catch (error) {
+                    console.error("Error loading ongoing events:", error);
+                    ongoingEventsList.innerHTML = '<p class="text-red-500 text-center">載入活動時發生錯誤</p>';
+                }
+            }
 
 
             // --- Event-Specific Logic ---
