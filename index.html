@@ -2262,10 +2262,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 const topicStatsContainer = document.getElementById('topic-vote-stats');
                 if (topicStatsContainer) {
                     const residentsById = {};
-                    (Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : []).forEach(r => { residentsById[r.id] = r; });
-                    const eligibleResidents = (Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : []).filter(r => r.isCheckedIn);
+                    const allResidents = Array.isArray(allResidentsForSelectedEvent) ? allResidentsForSelectedEvent : [];
+                    allResidents.forEach(r => { residentsById[r.id] = r; });
+                    const eligibleResidents = allResidents.filter(r => r.isCheckedIn);
                     const eligibleCount = eligibleResidents.length;
-                    const eligibleOwnershipTotal = eligibleResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
+                    const totalOwnershipAllResidents = allResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
                     let html = '';
                     (Array.isArray(currentTopics) ? currentTopics : []).forEach((t, idx) => {
                         const tvotes = votes.filter(v => v.topicId === t.id);
@@ -2291,12 +2292,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
                         const optsHtml = optionStats.map(s => {
                             const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                            const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
+                            const ratio = totalOwnershipAllResidents > 0 ? ((s.ownership / totalOwnershipAllResidents) * 100) : 0;
                             return `
                                 <div class="${highlight} rounded-md p-3">
                                     <div class="font-semibold">${s.label}</div>
                                     <div class="text-sm text-gray-600">票數：${s.count}</div>
-                                    <div class="text-sm text-gray-600">區分權合計：${s.ownership.toFixed(4)}%</div>
                                     <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(4)}%</div>
                                 </div>
                             `;
@@ -3600,10 +3600,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 const topics = Array.isArray(eventData.topics) ? eventData.topics : [];
                 const votes = Array.isArray(eventData.votes) ? eventData.votes : [];
                 const residentsById = {};
-                (Array.isArray(residentsData) ? residentsData : []).forEach(r => { residentsById[r.id] = r; });
-                const eligibleResidents = (Array.isArray(residentsData) ? residentsData : []).filter(r => r.isCheckedIn);
+                const allResidents = Array.isArray(residentsData) ? residentsData : [];
+                allResidents.forEach(r => { residentsById[r.id] = r; });
+                const eligibleResidents = allResidents.filter(r => r.isCheckedIn);
                 const eligibleCount = eligibleResidents.length;
-                const eligibleOwnershipTotal = eligibleResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
+                const totalOwnershipAllResidents = allResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
 
                 function getTopicDisplayNamePublic(topic, idx) {
                     const prefix = topic?.labelPrefix || '議題';
@@ -3639,12 +3640,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
                     const optsHtml = optionStats.map(s => {
                         const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                        const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
+                        const ratio = totalOwnershipAllResidents > 0 ? ((s.ownership / totalOwnershipAllResidents) * 100) : 0;
                         return `
                             <div class="${highlight} rounded-md p-3">
                                 <div class="font-semibold">${s.label}</div>
                                 <div class="text-sm text-gray-600">票數：${s.count}</div>
-                                <div class="text-sm text-gray-600">區分權合計：${s.ownership.toFixed(4)}%</div>
                                 <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(4)}%</div>
                             </div>
                         `;
