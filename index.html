@@ -3627,6 +3627,8 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 let controlsHtml = '';
 
                 if (mode === 'tabs') {
+                    // Tabs mode: make content container full width (single column)
+                    publicDashboardContent.className = 'grid grid-cols-1 gap-6';
                     const selectedIdx = Math.min(Math.max(parseInt(window.publicTopicIndex || 0, 10), 0), topics.length - 1);
                     const tabsHtml = topics.map((t, idx) => {
                         const active = idx === selectedIdx ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700';
@@ -3686,6 +3688,8 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         </div>
                     `;
                 } else {
+                    // List mode: keep two columns on md screens for multiple cards
+                    publicDashboardContent.className = 'grid grid-cols-1 md:grid-cols-2 gap-6';
                     // 列表模式：原本的全部議題一併呈現，加入切換控制與議題資訊
                     controlsHtml = `<div class="flex justify-end w-full"><button id=\"toggle-public-view-mode\" class=\"px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded\">切換為分頁</button></div>`;
                     topics.forEach((t, idx) => {
