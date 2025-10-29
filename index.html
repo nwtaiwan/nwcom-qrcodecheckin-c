@@ -416,7 +416,6 @@
                              <h3 class="text-lg font-semibold">議題列表</h3>
                              <div class="flex items-center gap-2 flex-wrap">
                                  <button id="add-topic-btn" class="bg-orange-500 text-white px-3 py-2 rounded-md hover:bg-orange-600 text-sm font-semibold">新增議題</button>
-                                 <button id="print-topics-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">列印</button>
                              </div>
                          </div>
                          <div class="mb-4">
@@ -814,7 +813,6 @@ const userDocPath = (userId) => ["users", userId];
             const modalButtons = document.getElementById('modal-buttons');
             const loader = document.getElementById('loader');
             const addTopicBtn = document.getElementById('add-topic-btn');
-            const printTopicsBtn = document.getElementById('print-topics-btn');
             const topicsTableHead = document.getElementById('topics-table-head');
             const topicsTableBody = document.getElementById('topics-table-body');
             const topicsMetaList = document.getElementById('topics-meta-list');
@@ -1507,9 +1505,6 @@ const userDocPath = (userId) => ["users", userId];
                     hideLoader();
                 }
             });
-            printTopicsBtn.addEventListener('click', () => {
-                window.print();
-            });
 
             function switchTab(tabKey) {
                 if (tabKey !== 'scanner') stopScanner();
@@ -1540,7 +1535,6 @@ const userDocPath = (userId) => ["users", userId];
                     <tr>
                         ${fixedHead.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
                         ${topicHeads.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
-                        <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                     </tr>
                 `;
                 topicsTableHead.innerHTML = headHtml;
@@ -1574,9 +1568,6 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         <td class="px-2 py-2 whitespace-nowrap">${resident.area || 0}</td>
                         <td class="px-2 py-2 whitespace-nowrap">${resident.ownership || 0}%</td>
                         ${topicCells}
-                        <td class="px-2 py-2 whitespace-nowrap text-sm font-medium">
-                            <button class="text-blue-600 hover:text-blue-900 text-xs py-1 px-2 rounded">詳細</button>
-                        </td>
                     `;
                     topicsTableBody.appendChild(tr);
                     currentTopics.forEach((t, tIdx) => {
@@ -1602,14 +1593,13 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 });
 
                 if (residents.length === 0) {
-                    topicsTableBody.innerHTML = `<tr><td colspan="${fixedHead.length + topicHeads.length + 1}" class="p-4 text-center text-gray-500">請先在「住戶管理」新增住戶</td></tr>`;
+                    topicsTableBody.innerHTML = `<tr><td colspan="${fixedHead.length + topicHeads.length}" class="p-4 text-center text-gray-500">請先在「住戶管理」新增住戶</td></tr>`;
                 }
 
                 if (currentTopics.length === 0) {
                     topicsTableHead.innerHTML = `
                         <tr>
                             ${fixedHead.map(h => `<th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">${h}</th>`).join('')}
-                            <th class="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">操作</th>
                         </tr>
                     `;
                 }
