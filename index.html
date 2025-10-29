@@ -3663,10 +3663,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     const proposerText = t?.proposer?.type === 'resident' ? `住戶(${t?.proposer?.unit || ''})` : '管委會';
                     const displayName = getTopicDisplayNamePublic(t, selectedIdx);
                     html = `
-                        <div class="flex justify-between items-center mb-3">
-                            <div class="flex flex-wrap gap-2">${tabsHtml}</div>
-                            <button id="toggle-public-view-mode" class="px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded">切換為列表</button>
-                        </div>
+                        <div class="flex flex-wrap gap-2 mb-3">${tabsHtml}</div>
                         <div class="bg-white p-4 rounded-lg shadow-sm">
                             <div class="font-semibold mb-2">議題名稱：${displayName}</div>
                             <div class="text-sm text-gray-700 mb-1">主旨：${t.title || ''}</div>
@@ -3675,7 +3672,10 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             <div class="flex items-center justify-between">
                                 <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
                             </div>
-                            <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                            <div class="flex justify-end mb-2">
+                                <button id="toggle-public-view-mode" class="px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded">切換為列表</button>
+                            </div>
+                            <div class="grid grid-cols-1 gap-3 mt-3">
                                 ${optsHtml}
                             </div>
                         </div>
