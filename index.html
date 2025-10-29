@@ -1013,8 +1013,8 @@ const userDocPath = (userId) => ["users", userId];
 
                     document.body.classList.remove('bg-red-600');
                     document.body.classList.add('bg-gray-50');
-                    userDisplay.textContent = `${currentUser.name} (${currentUser.role})`;
-                    userDisplayDetails.textContent = `${currentUser.name} (${currentUser.role})`;
+                    userDisplay.textContent = `${currentUser.name || ''}`;
+                    userDisplayDetails.textContent = `${currentUser.name || ''}`;
                     setupUIVisibilityByRole(currentUser.role);
                     showEventSelectionView();
                 } else {
@@ -2203,10 +2203,10 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 document.getElementById('scanner-checked-in').textContent = checkedInCount;
                 document.getElementById('scanner-total').textContent = allResidentsForSelectedEvent.length;
 
-                const personRate = allResidentsForSelectedEvent.length > 0 ? ((checkedInCount / allResidentsForSelectedEvent.length) * 100).toFixed(1) : 0;
+                const personRate = allResidentsForSelectedEvent.length > 0 ? ((checkedInCount / allResidentsForSelectedEvent.length) * 100).toFixed(2) : 0;
                 document.getElementById('check-in-rate').textContent = `${personRate}%`;
 
-                const ownershipRate = (checkedInOwnership).toFixed(4);
+                const ownershipRate = (checkedInOwnership).toFixed(2);
                 document.getElementById('ownership-check-in-rate').textContent = `${ownershipRate}%`;
 
                 document.getElementById('person-ratio-target').textContent = `(目標: ${currentPersonQuorumRatio}%)`;
@@ -2297,7 +2297,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                                 <div class="${highlight} rounded-md p-3">
                                     <div class="font-semibold">${s.label}</div>
                                     <div class="text-sm text-gray-600">票數：${s.count}</div>
-                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(4)}%</div>
+                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
                                 </div>
                             `;
                         }).join('');
@@ -2457,7 +2457,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         <td class="px-4 py-2 whitespace-nowrap">${r.unit}</td>
                         <td class="px-4 py-2">${r.name}</td>
                         <td class="px-4 py-2">${labels || '-'}</td>
-                        <td class="px-4 py-2 text-right">${r.ownership.toFixed(4)}%</td>
+                        <td class="px-4 py-2 text-right">${r.ownership.toFixed(2)}%</td>
                         <td class="px-4 py-2">${timeStr}</td>
                         <td class="px-4 py-2">${sources || '-'}</td>
                         <td class="px-4 py-2 text-center">${r.selections.size}</td>
@@ -3558,8 +3558,8 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     }
                 });
                 
-                const personRate = residentsData.length > 0 ? parseFloat(((checkedInCount / residentsData.length) * 100).toFixed(1)) : 0;
-                const ownershipRate = parseFloat(checkedInOwnership.toFixed(4));
+                const personRate = residentsData.length > 0 ? parseFloat(((checkedInCount / residentsData.length) * 100).toFixed(2)) : 0;
+                const ownershipRate = parseFloat(checkedInOwnership.toFixed(2));
                 
                 const personQuorumRatio = parseFloat(eventData.personRatio) || 0;
                 const ownershipQuorumRatio = parseFloat(eventData.ownershipRatio) || 0;
@@ -3646,7 +3646,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             <div class="${highlight} rounded-md p-3">
                                 <div class="font-semibold">${s.label}</div>
                                 <div class="text-sm text-gray-600">票數：${s.count}</div>
-                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(4)}%</div>
+                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
                             </div>
                         `;
                     }).join('');
