@@ -3718,6 +3718,14 @@ const topicCells = currentTopics.map((t, tIdx) => {
             const params = new URLSearchParams(window.location.search);
             const publicTarget = (params.get('target') || 'checkin').toLowerCase();
 
+            // 建立公開儀表板的切換 URL（保留既有查詢參數，僅調整 target）
+            const makePublicUrl = (target) => {
+                const newParams = new URLSearchParams(window.location.search);
+                newParams.set('view', 'public');
+                newParams.set('target', target);
+                return window.location.pathname + '?' + newParams.toString();
+            };
+
             const eventRef = doc(db, ...eventDocPath(eventId));
             onSnapshot(eventRef, (docSnap) => {
                 if (docSnap.exists()) {
@@ -3752,6 +3760,15 @@ const topicCells = currentTopics.map((t, tIdx) => {
             });
 
             function renderPublicDashboard(eventData, residentsData) {
+                // 儀表板切換按鈕（報到/投票）
+                const toggleHtml = `
+                    <div class="flex items-center justify-center w-full gap-2">
+                        <a href="${makePublicUrl('checkin')}" class="px-3 py-1 rounded-md text-sm ${publicTarget === 'checkin' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}">報到儀表板</a>
+                        <a href="${makePublicUrl('vote')}" class="px-3 py-1 rounded-md text-sm ${publicTarget === 'vote' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}">投票儀表板</a>
+                    </div>
+                `;
+                publicControls.innerHTML = toggleHtml;
+
                 let checkedInCount = 0;
                 let checkedInOwnership = 0;
 
@@ -3802,6 +3819,13 @@ const topicCells = currentTopics.map((t, tIdx) => {
             }
 
             function renderPublicVoteDashboard(eventData, residentsData) {
+                // 儀表板切換按鈕（報到/投票）
+                const toggleHtml = `
+                    <div class="flex items-center gap-2">
+                        <a href="${makePublicUrl('checkin')}" class="px-3 py-1 rounded-md text-sm ${publicTarget === 'checkin' ? 'bg-red-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}">報到儀表板</a>
+                        <a href="${makePublicUrl('vote')}" class="px-3 py-1 rounded-md text-sm ${publicTarget === 'vote' ? 'bg-indigo-600 text-white' : 'bg-gray-200 text-gray-700 hover:bg-gray-300'}">投票儀表板</a>
+                    </div>
+                `;
                 const topics = Array.isArray(eventData.topics) ? eventData.topics : [];
                 const votes = Array.isArray(eventData.votes) ? eventData.votes : [];
                 const residentsById = {};
@@ -3837,6 +3861,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     }).join(' ');
                     controlsHtml = `
                         <div class="flex items-center justify-between w-full">
+                            ${toggleHtml}
                             <div class="flex flex-wrap gap-2">${tabsHtml}</div>
                             <button id="toggle-public-view-mode" class="px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded">切換為列表</button>
                         </div>
@@ -3893,7 +3918,14 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     // List mode: keep two columns on md screens for multiple cards
                     publicDashboardContent.className = 'grid grid-cols-1 md:grid-cols-2 gap-6';
                     // 列表模式：原本的全部議題一併呈現，加入切換控制與議題資訊
-                    controlsHtml = `<div class="flex justify-end w-full"><button id=\"toggle-public-view-mode\" class=\"px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded\">切換為分頁</button></div>`;
+                    controlsHtml = `
+                        <div class="flex items-center justify-between w-full">
+                            ${toggleHtml}
+                            <div class="flex justify-end w-full">
+                                <button id="toggle-public-view-mode" class="px-2 py-1 text-xs sm:text-sm bg-gray-200 hover:bg-gray-300 rounded">切換為分頁</button>
+                            </div>
+                        </div>
+                    `;
                     topics.forEach((t, idx) => {
                         const tvotes = votes.filter(v => v.topicId === t.id);
                         const selectionByResident = new Map();
