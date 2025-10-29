@@ -2266,7 +2266,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     allResidents.forEach(r => { residentsById[r.id] = r; });
                     const eligibleResidents = allResidents.filter(r => r.isCheckedIn);
                     const eligibleCount = eligibleResidents.length;
-                    const totalOwnershipAllResidents = allResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
+                    const eligibleOwnershipTotal = eligibleResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
                     let html = '';
                     (Array.isArray(currentTopics) ? currentTopics : []).forEach((t, idx) => {
                         const tvotes = votes.filter(v => v.topicId === t.id);
@@ -2292,12 +2292,12 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
                         const optsHtml = optionStats.map(s => {
                             const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                            const ratio = totalOwnershipAllResidents > 0 ? ((s.ownership / totalOwnershipAllResidents) * 100) : 0;
+                            const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
                             return `
                                 <div class="${highlight} rounded-md p-3">
                                     <div class="font-semibold">${s.label}</div>
                                     <div class="text-sm text-gray-600">票數：${s.count}</div>
-                                    <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(4)}%</div>
+                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(4)}%</div>
                                 </div>
                             `;
                         }).join('');
@@ -3534,7 +3534,8 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     const residentsColRef = collection(db, ...residentsCollectionPath(eventId));
                     onSnapshot(residentsColRef, (residentsSnapshot) => {
                         const residents = [];
-                        residentsSnapshot.forEach(doc => residents.push(doc.data()));
+                        // 公開頁需保留每位住戶的 id 以便匹配 votes.residentId
+                        residentsSnapshot.forEach(doc => residents.push({ id: doc.id, ...doc.data() }));
                         if (publicTarget === 'vote') {
                             renderPublicVoteDashboard(data, residents);
                         } else {
@@ -3604,7 +3605,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 allResidents.forEach(r => { residentsById[r.id] = r; });
                 const eligibleResidents = allResidents.filter(r => r.isCheckedIn);
                 const eligibleCount = eligibleResidents.length;
-                const totalOwnershipAllResidents = allResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
+                const eligibleOwnershipTotal = eligibleResidents.reduce((sum, r) => sum + (parseFloat(r.ownership) || 0), 0);
 
                 function getTopicDisplayNamePublic(topic, idx) {
                     const prefix = topic?.labelPrefix || '議題';
@@ -3640,7 +3641,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
                     const optsHtml = optionStats.map(s => {
                         const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                        const ratio = totalOwnershipAllResidents > 0 ? ((s.ownership / totalOwnershipAllResidents) * 100) : 0;
+                        const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
                         return `
                             <div class="${highlight} rounded-md p-3">
                                 <div class="font-semibold">${s.label}</div>
