@@ -3661,6 +3661,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
                     });
                     const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                    const columns = optionStats.length || 1;
                     const optsHtml = optionStats.map(s => {
                         const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
                         const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
@@ -3682,7 +3683,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             <div class="text-sm text-gray-700 mb-1">說明：${t.description || '-'}</div>
                             <div class="text-sm text-gray-700 mb-3">提案人：${proposerText}</div>
                             <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
-                            <div class="grid grid-cols-1 gap-3 mt-3">
+                            <div class="grid gap-3 mt-3" style="grid-template-columns: repeat(${columns}, minmax(0, 1fr));">
                                 ${optsHtml}
                             </div>
                         </div>
@@ -3736,7 +3737,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                                     </div>
                                     <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
                                 </div>
-                                <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
+                                <div class="grid gap-3 mt-3" style="grid-template-columns: repeat(${optionStats.length || 1}, minmax(0, 1fr));">
                                     ${optsHtml}
                                 </div>
                             </div>
