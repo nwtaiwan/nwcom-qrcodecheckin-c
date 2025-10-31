@@ -1493,6 +1493,8 @@ const userDocPath = (userId) => ["users", userId];
                         options: newTopic.options,
                         multiSelect: newTopic.multiSelect,
                         maxSelections: newTopic.maxSelections,
+                        passCountThresholdPercent: newTopic.passCountThresholdPercent ?? 50,
+                        passOwnershipThresholdPercent: newTopic.passOwnershipThresholdPercent ?? 50,
                         createdAt: Timestamp.now(),
                         createdBy: currentUser.uid,
                         createdByName: currentUser.name
@@ -1906,7 +1908,9 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     proposer: { type: 'committee', unit: '' },
                     options: [{label:'同意'},{label:'不同意'},{label:'棄票'}],
                     multiSelect: false,
-                    maxSelections: 1
+                    maxSelections: 1,
+                    passCountThresholdPercent: 50,
+                    passOwnershipThresholdPercent: 50
                 };
                 const data = Object.assign({}, defaults, initial || {});
 
@@ -1947,6 +1951,16 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         <div class="flex items-center gap-3">
                             <label class="flex items-center gap-2"><input id="topic-multi" type="checkbox" ${data.multiSelect ? 'checked' : ''}/> 複選功能(設定票數)</label>
                             <input id="topic-max" type="number" min="1" value="${data.maxSelections || 1}" class="px-2 py-1 border rounded-md w-24 ${data.multiSelect ? '' : 'opacity-50'}" ${data.multiSelect ? '' : 'disabled'} />
+                        </div>
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                            <div>
+                                <label class="block text-sm text-gray-700 mb-1">票數門檻(%)</label>
+                                <input id="topic-pass-count-threshold" type="number" min="0" max="100" step="1" value="${data.passCountThresholdPercent}" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md" />
+                            </div>
+                            <div>
+                                <label class="block text-sm text-gray-700 mb-1">區分權門檻(%)</label>
+                                <input id="topic-pass-ownership-threshold" type="number" min="0" max="100" step="0.01" value="${data.passOwnershipThresholdPercent}" class="mt-1 w-full px-3 py-2 border border-gray-300 rounded-md" />
+                            </div>
                         </div>
                     </div>
                 `;
@@ -2026,6 +2040,8 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         const unit = proposerUnitSelect.classList.contains('hidden') ? '' : (proposerUnitSelect.value || '');
                         const multiSelect = multiCheckbox.checked;
                         const maxSelections = parseInt(maxInput.value, 10) || 1;
+                        const passCountThresholdPercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('topic-pass-count-threshold').value) || 50));
+                        const passOwnershipThresholdPercent = Math.max(0, Math.min(100, parseFloat(document.getElementById('topic-pass-ownership-threshold').value) || 50));
                         if (!title) {
                             // 基本驗證：主題必填
                             alert('請輸入主題');
@@ -2038,7 +2054,9 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             proposer: { type, unit },
                             options,
                             multiSelect,
-                            maxSelections
+                            maxSelections,
+                            passCountThresholdPercent,
+                            passOwnershipThresholdPercent
                         });
                     };
                     document.getElementById('modal-cancel-btn').onclick = () => {
@@ -2482,15 +2500,19 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             });
                             return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
                         });
-                        const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                        const countThreshold = parseFloat(t.passCountThresholdPercent ?? 50);
+                        const ownershipThreshold = parseFloat(t.passOwnershipThresholdPercent ?? 50);
                         const optsHtml = optionStats.map(s => {
-                            const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                            const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
+                            const countRatio = eligibleCount > 0 ? (s.count / eligibleCount) * 100 : 0;
+                            const ownershipRatio = eligibleOwnershipTotal > 0 ? (s.ownership / eligibleOwnershipTotal) * 100 : 0;
+                            const meetsBoth = countRatio >= countThreshold && ownershipRatio >= ownershipThreshold;
+                            const meetsEither = !meetsBoth && (countRatio >= countThreshold || ownershipRatio >= ownershipThreshold);
+                            const highlight = meetsBoth ? 'border-2 border-green-500' : (meetsEither ? 'border-2 border-yellow-500' : 'border border-gray-200');
                             return `
                                 <div class="${highlight} rounded-md p-3">
                                     <div class="font-semibold">${s.label}</div>
-                                    <div class="text-sm text-gray-600">票數：${s.count}</div>
-                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
+                                    <div class="text-sm text-gray-600">票數：${s.count}（${countRatio.toFixed(2)}%）</div>
+                                    <div class="text-sm text-gray-600">區分權比例：${ownershipRatio.toFixed(2)}%</div>
                                 </div>
                             `;
                         }).join('');
@@ -2501,6 +2523,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                                     <div class="flex items-center gap-2">
                                         <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
                                         <button class="view-topic-votes-btn px-2 py-1 text-xs sm:text-sm bg-indigo-600 text-white rounded-md hover:bg-indigo-700" data-topic-id="${t.id}" data-topic-idx="${idx}">查看投票明細</button>
+                                        <button class="end-topic-btn px-2 py-1 text-xs sm:text-sm bg-red-600 text-white rounded-md hover:bg-red-700" data-topic-id="${t.id}">投票結束</button>
                                     </div>
                                 </div>
                                 <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-3">
@@ -2517,6 +2540,29 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             const tIdx = parseInt(btn.getAttribute('data-topic-idx'), 10) || 0;
                             const topic = (Array.isArray(currentTopics) ? currentTopics : []).find(x => x.id === tid);
                             if (topic) openTopicVoteDetailsModal(topic, tIdx);
+                        };
+                    });
+                    // 綁定投票結束
+                    topicStatsContainer.querySelectorAll('.end-topic-btn').forEach(btn => {
+                        btn.onclick = async () => {
+                            const tid = btn.getAttribute('data-topic-id');
+                            if (!selectedEventId || !tid) return;
+                            const ok = await showCustomConfirm('確定要結束此議題的投票嗎？結束後將不可再投票。', '投票結束');
+                            if (!ok) return;
+                            try {
+                                showLoader();
+                                const eventRef = doc(db, ...eventDocPath(selectedEventId));
+                                const snap = await getDoc(eventRef);
+                                const prevTopics = (snap.exists() && Array.isArray(snap.data().topics)) ? snap.data().topics : [];
+                                const nextTopics = prevTopics.map(t => t.id === tid ? { ...t, isClosed: true, closedAt: Timestamp.now() } : t);
+                                await updateDoc(eventRef, { topics: nextTopics });
+                                showCustomAlert('已結束投票', '完成');
+                            } catch (err) {
+                                console.error('End topic voting error:', err);
+                                showCustomAlert('結束投票失敗，請稍後再試');
+                            } finally {
+                                hideLoader();
+                            }
                         };
                     });
                 }
@@ -3876,16 +3922,20 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         });
                         return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
                     });
-                    const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                    const countThreshold = parseFloat(t.passCountThresholdPercent ?? 50);
+                    const ownershipThreshold = parseFloat(t.passOwnershipThresholdPercent ?? 50);
                     const columns = optionStats.length || 1;
                     const optsHtml = optionStats.map(s => {
-                        const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                        const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
+                        const countRatio = eligibleCount > 0 ? (s.count / eligibleCount) * 100 : 0;
+                        const ownershipRatio = eligibleOwnershipTotal > 0 ? (s.ownership / eligibleOwnershipTotal) * 100 : 0;
+                        const meetsBoth = countRatio >= countThreshold && ownershipRatio >= ownershipThreshold;
+                        const meetsEither = !meetsBoth && (countRatio >= countThreshold || ownershipRatio >= ownershipThreshold);
+                        const highlight = meetsBoth ? 'border-2 border-green-500' : (meetsEither ? 'border-2 border-yellow-500' : 'border border-gray-200');
                         return `
                             <div class="${highlight} rounded-md p-3">
                                 <div class="font-semibold">${s.label}</div>
-                                <div class="text-sm text-gray-600">投票人數：${s.count}</div>
-                                <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
+                                <div class="text-sm text-gray-600">投票人數：${s.count}（${countRatio.toFixed(2)}%）</div>
+                                <div class="text-sm text-gray-600">區分權比例：${ownershipRatio.toFixed(2)}%</div>
                             </div>
                         `;
                     }).join('');
@@ -3935,15 +3985,19 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             });
                             return { label: opt.label || `選項${optIdx + 1}`, count, ownership: ownershipSum };
                         });
-                        const maxOwnership = optionStats.length > 0 ? Math.max(...optionStats.map(s => s.ownership)) : 0;
+                        const countThreshold = parseFloat(t.passCountThresholdPercent ?? 50);
+                        const ownershipThreshold = parseFloat(t.passOwnershipThresholdPercent ?? 50);
                         const optsHtml = optionStats.map(s => {
-                            const highlight = s.ownership === maxOwnership && maxOwnership > 0 ? 'border-2 border-green-500' : 'border border-gray-200';
-                            const ratio = eligibleOwnershipTotal > 0 ? ((s.ownership / eligibleOwnershipTotal) * 100) : 0;
+                            const countRatio = eligibleCount > 0 ? (s.count / eligibleCount) * 100 : 0;
+                            const ownershipRatio = eligibleOwnershipTotal > 0 ? (s.ownership / eligibleOwnershipTotal) * 100 : 0;
+                            const meetsBoth = countRatio >= countThreshold && ownershipRatio >= ownershipThreshold;
+                            const meetsEither = !meetsBoth && (countRatio >= countThreshold || ownershipRatio >= ownershipThreshold);
+                            const highlight = meetsBoth ? 'border-2 border-green-500' : (meetsEither ? 'border-2 border-yellow-500' : 'border border-gray-200');
                             return `
                                 <div class="${highlight} rounded-md p-3">
                                     <div class="font-semibold">${s.label}</div>
-                                    <div class="text-sm text-gray-600">投票人數：${s.count}</div>
-                                    <div class="text-sm text-gray-600">區分權比例：${ratio.toFixed(2)}%</div>
+                                    <div class="text-sm text-gray-600">投票人數：${s.count}（${countRatio.toFixed(2)}%）</div>
+                                    <div class="text-sm text-gray-600">區分權比例：${ownershipRatio.toFixed(2)}%</div>
                                 </div>
                             `;
                         }).join('');
@@ -3958,7 +4012,10 @@ const topicCells = currentTopics.map((t, tIdx) => {
                                         <div class="text-sm text-gray-700">說明：${t.description || '-'}</div>
                                         <div class="text-sm text-gray-700">提案人：${proposerText}</div>
                                     </div>
-                                    <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                                    <div class="flex items-center gap-2">
+                                        <div class="text-sm text-gray-600">應投票人數：${eligibleCount}</div>
+                                        <button class="px-2 py-1 text-xs sm:text-sm bg-red-600 text-white rounded-md opacity-60 cursor-not-allowed" title="僅管理端可結束投票">投票結束</button>
+                                    </div>
                                 </div>
                                 <div class="grid gap-3 mt-3" style="grid-template-columns: repeat(${optionStats.length || 1}, minmax(0, 1fr));">
                                     ${optsHtml}
