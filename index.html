@@ -1075,11 +1075,12 @@ const userDocPath = (userId) => ["users", userId];
                     const userSnap = await getDoc(userRef);
 
                     if (userSnap.exists()) {
-                        currentUser = { uid: user.uid, name: username, role: userSnap.data().role };
+                        const udata = userSnap.data();
+                        currentUser = { uid: user.uid, name: username, role: udata.role, allowedEventIds: Array.isArray(udata.allowedEventIds) ? udata.allowedEventIds : [] };
                     } else {
                         const role = username === 'test' ? 'system_admin' : 'staff'; 
-                        await setDoc(userRef, { username: username, email: user.email, role: role });
-                        currentUser = { uid: user.uid, name: username, role: role };
+                        await setDoc(userRef, { username: username, email: user.email, role: role, allowedEventIds: [] });
+                        currentUser = { uid: user.uid, name: username, role: role, allowedEventIds: [] };
                     }
                     
                     if(currentUser.role === 'system_admin') {
@@ -1133,7 +1134,7 @@ const userDocPath = (userId) => ["users", userId];
                 tabResidents.style.display = 'none';
                 tabSettings.style.display = 'none';
                 
-                // Dashboard, Scanner and Voting tabs are always visible for logged-in users
+                // Baseline visible tabs for logged-in users
                 tabDashboard.style.display = 'block';
                 tabScanner.style.display = 'block';
                 tabVoteDashboard.style.display = 'block';
@@ -1158,6 +1159,15 @@ const userDocPath = (userId) => ["users", userId];
                     userManagementBtn.style.display = 'block';
                     tabResidents.style.display = 'block';
                     tabSettings.style.display = 'block';
+                }
+                // Staff 限定僅可使用掃碼分頁
+                if (role === 'staff') {
+                    tabDashboard.style.display = 'none';
+                    tabVoteDashboard.style.display = 'none';
+                    tabTopicVote.style.display = 'none';
+                    // 僅保留報到掃碼與投票掃碼
+                    tabScanner.style.display = 'block';
+                    tabScanVote.style.display = 'block';
                 }
             }
 
@@ -1251,6 +1261,19 @@ const userDocPath = (userId) => ["users", userId];
                         const dateB = b.eventDate ? new Date(b.eventDate).getTime() : 0;
                         return dateB - dateA;
                     });
+
+                    // Staff 僅能看到被指派的活動
+                    if (currentUser && currentUser.role === 'staff') {
+                        const allowed = Array.isArray(currentUser.allowedEventIds) ? currentUser.allowedEventIds : [];
+                        const filtered = allowed.length > 0 ? eventsData.filter(e => allowed.includes(e.id)) : [];
+                        if (filtered.length === 0) {
+                            eventsList.innerHTML = `<p class="text-gray-500 md:col-span-3 text-center">尚未被指派可操作的活動，請洽管理員。</p>`;
+                            return;
+                        }
+                        // 覆蓋為過濾後清單
+                        eventsData.length = 0;
+                        filtered.forEach(e => eventsData.push(e));
+                    }
 
                     eventsData.forEach(event => {
                         const card = document.createElement('div');
@@ -3589,6 +3612,7 @@ const topicCells = currentTopics.map((t, tIdx) => {
                              <td class="px-2 py-2 whitespace-nowrap">${userData.role}</td>
                              <td class="px-2 py-2 whitespace-nowrap text-sm font-medium">
                                  <button data-id="${doc.id}" class="change-role-btn text-blue-600 hover:text-blue-900">變更角色</button>
+                                 ${userData.role === 'staff' ? `<button data-id="${doc.id}" class="edit-user-settings-btn text-indigo-600 hover:text-indigo-900 ml-2">編輯設定</button>` : ''}
                                  <button data-id="${doc.id}" class="delete-user-btn text-red-600 hover:text-red-900 ml-2">刪除</button>
                              </td>
                          `;
@@ -3633,6 +3657,55 @@ const topicCells = currentTopics.map((t, tIdx) => {
                         }
                     } else if (newRole) {
                         showCustomAlert('無效的角色名稱！');
+                    }
+                }
+
+                if (target.classList.contains('edit-user-settings-btn')) {
+                    // 僅 staff 角色支援可操作活動設定
+                    try {
+                        showLoader();
+                        const userRef = doc(db, ...userDocPath(userId));
+                        const userSnap = await getDoc(userRef);
+                        const currentAllowed = userSnap.exists() && Array.isArray(userSnap.data().allowedEventIds) ? userSnap.data().allowedEventIds : [];
+
+                        // 取得全部活動供勾選
+                        const evSnap = await getDocs(query(collection(db, ...eventsCollectionPath())));
+                        const events = [];
+                        evSnap.forEach(d => events.push({ id: d.id, ...d.data() }));
+
+                        // 建立勾選清單 UI
+                        modalTitle.textContent = '編輯帳號可操作活動 (Staff)';
+                        const listHtml = events.length === 0 ? '<div class="text-gray-500">目前尚無活動可指派</div>' : events.map(ev => {
+                            const checked = currentAllowed.includes(ev.id) ? 'checked' : '';
+                            const label = `${ev.communityName || '社區'} - ${ev.eventName || '活動'} (${ev.eventDate ? ev.eventDate.replace('T',' ') : ''})`;
+                            return `<label class="flex items-center gap-2 py-1"><input type="checkbox" class="staff-assign-event" value="${ev.id}" ${checked}/> <span>${label}</span></label>`;
+                        }).join('');
+                        modalMessage.innerHTML = `<div class="max-h-64 overflow-y-auto">${listHtml}</div>`;
+                        modalButtons.innerHTML = `
+                            <button id="modal-save-assign" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-red-700">儲存</button>
+                            <button id="modal-cancel-assign" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-gray-300">取消</button>
+                        `;
+                        customModal.classList.remove('hidden');
+
+                        document.getElementById('modal-cancel-assign').onclick = () => {
+                            customModal.classList.add('hidden');
+                        };
+                        document.getElementById('modal-save-assign').onclick = async () => {
+                            const ids = Array.from(document.querySelectorAll('.staff-assign-event:checked')).map(i => i.value);
+                            try {
+                                await updateDoc(userRef, { allowedEventIds: ids });
+                                customModal.classList.add('hidden');
+                                showCustomAlert('已更新可操作活動');
+                            } catch (err) {
+                                console.error('Update allowedEventIds failed:', err);
+                                showCustomAlert('更新失敗，請稍後再試');
+                            }
+                        };
+                    } catch (err) {
+                        console.error('Open staff assign modal error:', err);
+                        showCustomAlert('開啟編輯設定失敗');
+                    } finally {
+                        hideLoader();
                     }
                 }
             });
