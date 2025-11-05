@@ -1062,6 +1062,71 @@ const userDocPath = (userId) => ["users", userId];
 
             document.getElementById('logout-btn-events').addEventListener('click', handleLogout);
             document.getElementById('logout-btn-details').addEventListener('click', handleLogout);
+
+            // 動態插入「重設密碼」按鈕到兩個導覽區（事件列表、活動詳情）
+            function attachResetPasswordButton(anchorBtnId) {
+                const anchorBtn = document.getElementById(anchorBtnId);
+                if (!anchorBtn || document.getElementById(`reset-password-btn-${anchorBtnId}`)) return;
+                const resetBtn = document.createElement('button');
+                resetBtn.id = `reset-password-btn-${anchorBtnId}`;
+                resetBtn.className = 'ml-2 px-3 py-1 rounded bg-indigo-600 hover:bg-indigo-700 text-white text-sm';
+                resetBtn.textContent = '重設密碼';
+                resetBtn.addEventListener('click', async () => {
+                    try {
+                        // 以通用 modal 呈現自助變更密碼表單
+                        modalTitle.textContent = '變更密碼';
+                        modalMessage.innerHTML = `
+                            <div class="space-y-2">
+                                <input id="self-new-pwd" type="password" placeholder="新密碼（至少 6 字元）" class="w-full px-3 py-2 border rounded" />
+                                <input id="self-new-pwd2" type="password" placeholder="再次輸入新密碼" class="w-full px-3 py-2 border rounded" />
+                            </div>
+                        `;
+                        modalButtons.innerHTML = `
+                            <button id="modal-save-newpwd" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-red-700">儲存</button>
+                            <button id="modal-cancel-newpwd" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-gray-300">取消</button>
+                        `;
+                        customModal.classList.remove('hidden');
+
+                        document.getElementById('modal-cancel-newpwd').onclick = () => {
+                            customModal.classList.add('hidden');
+                        };
+                        document.getElementById('modal-save-newpwd').onclick = async () => {
+                            const p1 = /** @type {HTMLInputElement} */(document.getElementById('self-new-pwd')).value;
+                            const p2 = /** @type {HTMLInputElement} */(document.getElementById('self-new-pwd2')).value;
+                            if (!p1 || p1.length < 6) { showCustomAlert('密碼長度至少 6 字元'); return; }
+                            if (p1 !== p2) { showCustomAlert('兩次輸入的密碼不一致'); return; }
+                            try {
+                                showLoader();
+                                let updatePasswordFn = window.__updatePasswordFn;
+                                if (!updatePasswordFn) {
+                                    const mod = await import('https://www.gstatic.com/firebasejs/10.7.0/firebase-auth.js');
+                                    updatePasswordFn = mod.updatePassword;
+                                    window.__updatePasswordFn = updatePasswordFn;
+                                }
+                                await updatePasswordFn(auth.currentUser, p1);
+                                customModal.classList.add('hidden');
+                                showCustomAlert('密碼已更新，下次登入請使用新密碼');
+                            } catch (err) {
+                                console.error('Self password update failed:', err);
+                                const code = err?.code || '';
+                                if (code === 'auth/requires-recent-login') {
+                                    showCustomAlert('變更密碼需要重新登入，請先登出後再登入。');
+                                } else {
+                                    showCustomAlert('變更失敗，請稍後再試');
+                                }
+                            } finally {
+                                hideLoader();
+                            }
+                        };
+                    } catch (err) {
+                        console.error('Open self-change-password modal error:', err);
+                        showCustomAlert('開啟變更密碼失敗');
+                    }
+                });
+                anchorBtn.parentElement?.insertBefore(resetBtn, anchorBtn);
+            }
+            attachResetPasswordButton('logout-btn-events');
+            attachResetPasswordButton('logout-btn-details');
             
             onAuthStateChanged(auth, async user => {
                 unsubscribeResidents();
@@ -1076,11 +1141,11 @@ const userDocPath = (userId) => ["users", userId];
 
                     if (userSnap.exists()) {
                         const udata = userSnap.data();
-                        currentUser = { uid: user.uid, name: username, role: udata.role, allowedEventIds: Array.isArray(udata.allowedEventIds) ? udata.allowedEventIds : [] };
+                        currentUser = { uid: user.uid, name: username, role: udata.role, email: user.email || udata.email || '', allowedEventIds: Array.isArray(udata.allowedEventIds) ? udata.allowedEventIds : [] };
                     } else {
                         const role = username === 'test' ? 'system_admin' : 'staff'; 
                         await setDoc(userRef, { username: username, email: user.email, role: role, allowedEventIds: [] });
-                        currentUser = { uid: user.uid, name: username, role: role, allowedEventIds: [] };
+                        currentUser = { uid: user.uid, name: username, role: role, email: user.email || '', allowedEventIds: [] };
                     }
                     
                     if(currentUser.role === 'system_admin') {
@@ -1486,8 +1551,9 @@ const userDocPath = (userId) => ["users", userId];
                 // Topics are now synced via event doc snapshot in listenToEventSettings
                 unsubscribeTopics();
                 unsubscribeTopics = () => {};
-                
-                switchTab('dashboard');
+                // Staff 預設進入報到掃碼，其餘角色維持儀表板
+                const defaultTab = (currentUser && currentUser.role === 'staff') ? 'scanner' : 'dashboard';
+                switchTab(defaultTab);
             }
 
             // --- Tabs Navigation ---
@@ -1532,6 +1598,10 @@ const userDocPath = (userId) => ["users", userId];
             });
 
             function switchTab(tabKey) {
+                // Staff 僅允許切換至掃碼分頁；其他分頁一律導回報到掃碼
+                if (currentUser && currentUser.role === 'staff' && tabKey !== 'scanner' && tabKey !== 'scanvote') {
+                    tabKey = 'scanner';
+                }
                 if (tabKey !== 'scanner') stopScanner();
                 Object.keys(tabs).forEach(key => {
                     // Only toggle if the tab exists and is visible
@@ -3607,19 +3677,19 @@ const topicCells = currentTopics.map((t, tIdx) => {
                          if(doc.id === currentUser.uid) return;
                          
                          const tr = document.createElement('tr');
-                         tr.innerHTML = `
-                             <td class="px-2 py-2 whitespace-nowrap">${userData.username}</td>
-                             <td class="px-2 py-2 whitespace-nowrap">${userData.role}</td>
-                             <td class="px-2 py-2 whitespace-nowrap text-sm font-medium">
-                                 <button data-id="${doc.id}" class="change-role-btn text-blue-600 hover:text-blue-900">變更角色</button>
-                                 ${userData.role === 'staff' ? `<button data-id="${doc.id}" class="edit-user-settings-btn text-indigo-600 hover:text-indigo-900 ml-2">編輯設定</button>` : ''}
-                                 <button data-id="${doc.id}" class="delete-user-btn text-red-600 hover:text-red-900 ml-2">刪除</button>
-                             </td>
-                         `;
-                         userListTbody.appendChild(tr);
-                     });
-                 });
-            }
+                          tr.innerHTML = `
+                              <td class="px-2 py-2 whitespace-nowrap">${userData.username}</td>
+                              <td class="px-2 py-2 whitespace-nowrap">${userData.role}</td>
+                              <td class="px-2 py-2 whitespace-nowrap text-sm font-medium">
+                                  <button data-id="${doc.id}" class="change-role-btn text-blue-600 hover:text-blue-900">變更角色</button>
+                                 <button data-id="${doc.id}" class="edit-user-settings-btn text-indigo-600 hover:text-indigo-900 ml-2">編輯設定</button>
+                                  <button data-id="${doc.id}" class="delete-user-btn text-red-600 hover:text-red-900 ml-2">刪除</button>
+                              </td>
+                          `;
+                          userListTbody.appendChild(tr);
+                      });
+                  });
+             }
 
             document.getElementById('users-list').addEventListener('click', async (e) => {
                 const target = e.target;
@@ -3661,46 +3731,74 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 }
 
                 if (target.classList.contains('edit-user-settings-btn')) {
-                    // 僅 staff 角色支援可操作活動設定
                     try {
                         showLoader();
                         const userRef = doc(db, ...userDocPath(userId));
                         const userSnap = await getDoc(userRef);
-                        const currentAllowed = userSnap.exists() && Array.isArray(userSnap.data().allowedEventIds) ? userSnap.data().allowedEventIds : [];
+                        const udata = userSnap.exists() ? userSnap.data() : { role: 'staff', username: '', email: '' };
 
-                        // 取得全部活動供勾選
-                        const evSnap = await getDocs(query(collection(db, ...eventsCollectionPath())));
-                        const events = [];
-                        evSnap.forEach(d => events.push({ id: d.id, ...d.data() }));
-
-                        // 建立勾選清單 UI
-                        modalTitle.textContent = '編輯帳號可操作活動 (Staff)';
-                        const listHtml = events.length === 0 ? '<div class="text-gray-500">目前尚無活動可指派</div>' : events.map(ev => {
-                            const checked = currentAllowed.includes(ev.id) ? 'checked' : '';
-                            const label = `${ev.communityName || '社區'} - ${ev.eventName || '活動'} (${ev.eventDate ? ev.eventDate.replace('T',' ') : ''})`;
-                            return `<label class="flex items-center gap-2 py-1"><input type="checkbox" class="staff-assign-event" value="${ev.id}" ${checked}/> <span>${label}</span></label>`;
-                        }).join('');
-                        modalMessage.innerHTML = `<div class="max-h-64 overflow-y-auto">${listHtml}</div>`;
-                        modalButtons.innerHTML = `
-                            <button id="modal-save-assign" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-red-700">儲存</button>
-                            <button id="modal-cancel-assign" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-gray-300">取消</button>
-                        `;
-                        customModal.classList.remove('hidden');
-
-                        document.getElementById('modal-cancel-assign').onclick = () => {
-                            customModal.classList.add('hidden');
-                        };
-                        document.getElementById('modal-save-assign').onclick = async () => {
-                            const ids = Array.from(document.querySelectorAll('.staff-assign-event:checked')).map(i => i.value);
-                            try {
-                                await updateDoc(userRef, { allowedEventIds: ids });
-                                customModal.classList.add('hidden');
-                                showCustomAlert('已更新可操作活動');
-                            } catch (err) {
-                                console.error('Update allowedEventIds failed:', err);
-                                showCustomAlert('更新失敗，請稍後再試');
-                            }
-                        };
+                        if (udata.role === 'staff') {
+                            const currentAllowed = Array.isArray(udata.allowedEventIds) ? udata.allowedEventIds : [];
+                            // 取得全部活動供勾選
+                            const evSnap = await getDocs(query(collection(db, ...eventsCollectionPath())));
+                            const events = [];
+                            evSnap.forEach(d => events.push({ id: d.id, ...d.data() }));
+                            // 建立勾選清單 UI
+                            modalTitle.textContent = '編輯帳號可操作活動 (Staff)';
+                            const listHtml = events.length === 0 ? '<div class="text-gray-500">目前尚無活動可指派</div>' : events.map(ev => {
+                                const checked = currentAllowed.includes(ev.id) ? 'checked' : '';
+                                const label = `${ev.communityName || '社區'} - ${ev.eventName || '活動'} (${ev.eventDate ? ev.eventDate.replace('T',' ') : ''})`;
+                                return `<label class="flex items-center gap-2 py-1"><input type="checkbox" class="staff-assign-event" value="${ev.id}" ${checked}/> <span>${label}</span></label>`;
+                            }).join('');
+                            modalMessage.innerHTML = `<div class="max-h-64 overflow-y-auto">${listHtml}</div>`;
+                            modalButtons.innerHTML = `
+                                <button id="modal-save-assign" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-red-700">儲存</button>
+                                <button id="modal-cancel-assign" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-gray-300">取消</button>
+                            `;
+                            customModal.classList.remove('hidden');
+                            document.getElementById('modal-cancel-assign').onclick = () => { customModal.classList.add('hidden'); };
+                            document.getElementById('modal-save-assign').onclick = async () => {
+                                const ids = Array.from(document.querySelectorAll('.staff-assign-event:checked')).map(i => i.value);
+                                try {
+                                    await updateDoc(userRef, { allowedEventIds: ids });
+                                    customModal.classList.add('hidden');
+                                    showCustomAlert('已更新可操作活動');
+                                } catch (err) {
+                                    console.error('Update allowedEventIds failed:', err);
+                                    showCustomAlert('更新失敗，請稍後再試');
+                                }
+                            };
+                        } else {
+                            // 通用帳號編輯（非 staff）：可修改顯示帳號與備存 email
+                            modalTitle.textContent = '編輯帳號資料';
+                            modalMessage.innerHTML = `
+                                <div class="space-y-2">
+                                    <label class="block text-sm">帳號</label>
+                                    <input id="edit-username" type="text" class="w-full px-3 py-2 border rounded" value="${udata.username || ''}" />
+                                    <label class="block text-sm mt-2">Email（用於通知）</label>
+                                    <input id="edit-email" type="email" class="w-full px-3 py-2 border rounded" value="${udata.email || ''}" />
+                                    <p class="text-xs text-gray-500 mt-1">提醒：此處更新的 Email 為資料備存，非登入用 Email。</p>
+                                </div>
+                            `;
+                            modalButtons.innerHTML = `
+                                <button id="modal-save-user" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-red-700">儲存</button>
+                                <button id="modal-cancel-user" class="px-4 py-2 bg-gray-200 text-gray-800 text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-gray-300">取消</button>
+                            `;
+                            customModal.classList.remove('hidden');
+                            document.getElementById('modal-cancel-user').onclick = () => { customModal.classList.add('hidden'); };
+                            document.getElementById('modal-save-user').onclick = async () => {
+                                const newUsername = /** @type {HTMLInputElement} */(document.getElementById('edit-username')).value;
+                                const newEmail = /** @type {HTMLInputElement} */(document.getElementById('edit-email')).value;
+                                try {
+                                    await updateDoc(userRef, { username: newUsername, email: newEmail });
+                                    customModal.classList.add('hidden');
+                                    showCustomAlert('帳號資料已更新');
+                                } catch (err) {
+                                    console.error('Update user profile failed:', err);
+                                    showCustomAlert('更新失敗，請稍後再試');
+                                }
+                            };
+                        }
                     } catch (err) {
                         console.error('Open staff assign modal error:', err);
                         showCustomAlert('開啟編輯設定失敗');
