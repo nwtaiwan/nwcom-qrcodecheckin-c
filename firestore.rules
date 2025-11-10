@@ -95,5 +95,25 @@ service cloud.firestore {
         allow delete: if isManager();
       }
     }
+
+    // events_archive 集合（已歸檔活動）：
+    match /events_archive/{eventId} {
+      // 讀取：公開（供活動資料庫頁面顯示）
+      allow get, list: if true;
+      // 建立／更新／刪除：僅管理者（用於歸檔與維護）
+      allow create, update, delete: if isManager();
+
+      // topics 子集合（議題，歸檔版）
+      match /topics/{topicId} {
+        allow get, list: if true;
+        allow create, update, delete: if isManager();
+      }
+
+      // residents 子集合（住戶，歸檔版）
+      match /residents/{residentId} {
+        allow get, list: if true;
+        allow create, update, delete: if isManager();
+      }
+    }
   }
 }
