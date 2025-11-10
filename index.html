@@ -1508,8 +1508,8 @@ const userDocPath = (userId) => ["users", userId];
                                 e.target.closest('.duplicate-event-card-btn') ||
                                 e.target.closest('.archive-event-card-btn')
                             ) {
-                                // 點擊卡片上的操作按鈕時不進入活動詳情
-                                e.stopPropagation();
+                                // 點擊卡片上的操作按鈕時，不進入活動詳情；
+                                // 讓事件氣泡到父層，由父層的委派監聽器處理按鈕動作。
                                 return;
                             }
                             showEventDetailsView(event.id);
