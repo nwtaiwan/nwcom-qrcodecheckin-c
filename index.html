@@ -1289,8 +1289,11 @@ const userDocPath = (userId) => ["users", userId];
             function showEventSelectionView() {
                 selectedEventId = null;
                 loginView.classList.add('hidden');
+                ongoingEventsView.classList.add('hidden');
+                eventDashboardView.classList.add('hidden');
                 eventDetailsView.classList.add('hidden');
                 userManagementView.classList.add('hidden');
+                eventsArchiveView.classList.add('hidden');
                 eventSelectionView.classList.remove('hidden');
                 stopScanner();
                 listenToEvents();
@@ -3694,7 +3697,12 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 const srcSnap = await getDoc(srcEventRef);
                 if (!srcSnap.exists()) throw new Error('Source event not found');
                 const data = srcSnap.data();
-                await setDoc(doc(db, ...eventArchiveDocPath(eventId)), data);
+                await setDoc(doc(db, ...eventArchiveDocPath(eventId)), {
+                    ...data,
+                    archivedAt: serverTimestamp(),
+                    archivedBy: currentUser && currentUser.uid ? currentUser.uid : null,
+                    archivedByName: currentUser && currentUser.name ? currentUser.name : null
+                });
                 await copySubcollection(
                     collection(db, ...residentsCollectionPath(eventId)),
                     collection(db, ...residentsArchiveCollectionPath(eventId))
