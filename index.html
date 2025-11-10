@@ -1407,13 +1407,22 @@ const userDocPath = (userId) => ["users", userId];
                     eventsData.forEach(event => {
                         const card = document.createElement('div');
                         const isOwner = currentUser && currentUser.uid === event.creatorId;
+                        const canRestore = currentUser && (currentUser.role === 'system_admin' || currentUser.role === 'senior_manager');
                         card.className = `p-6 rounded-xl shadow-md transition flex flex-col justify-between ${isOwner ? 'bg-red-50' : 'bg-white'} hover:shadow-lg`;
+                        card.classList.add('archived-event-card');
+                        card.setAttribute('data-id', event.id);
                         const formattedDateTime = event.eventDate ? event.eventDate.replace('T', ' ') : '無日期';
+                        const actionsHTML = `
+                            <div class="flex items-center space-x-2">
+                                <button data-id="${event.id}" class="view-archived-event-btn text-xs font-semibold px-2 py-1 rounded-md border ${isOwner ? 'border-red-300 text-red-700 hover:bg-red-50' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}">查看</button>
+                                ${canRestore ? `<button data-id="${event.id}" class="restore-archived-event-btn text-xs font-semibold px-2 py-1 rounded-md border ${isOwner ? 'border-red-300 text-red-700 hover:bg-red-50' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}">恢復到活動列表</button>` : ''}
+                            </div>
+                        `;
                         card.innerHTML = `
                             <div>
                                 <div class="flex justify-between items-start">
                                     <h3 class="text-lg font-bold text-red-700">${event.communityName}</h3>
-                                    <span class="text-xs text-gray-400">已歸檔</span>
+                                    ${actionsHTML}
                                 </div>
                                 <p class="text-md text-gray-800">${event.eventName}</p>
                             </div>
@@ -1429,6 +1438,67 @@ const userDocPath = (userId) => ["users", userId];
                     showCustomAlert('無法讀取活動資料庫，請檢查您的網路連線或 Firebase 安全規則。');
                 });
             }
+
+            async function openArchivedEventDetails(eventId) {
+                const ref = doc(db, ...eventArchiveDocPath(eventId));
+                const snap = await getDoc(ref);
+                if (!snap.exists()) {
+                    showCustomAlert('找不到活動資料。');
+                    return;
+                }
+                const data = snap.data();
+                modalTitle.textContent = '活動資料庫 - 活動詳情';
+                const dateStr = data.eventDate ? data.eventDate.replace('T', ' ') : '無日期';
+                modalMessage.innerHTML = `
+                    <div class="space-y-2 text-sm">
+                        <div><span class="font-semibold text-gray-700">社區名稱：</span><span class="text-gray-800">${data.communityName || ''}</span></div>
+                        <div><span class="font-semibold text-gray-700">活動名稱：</span><span class="text-gray-800">${data.eventName || ''}</span></div>
+                        <div><span class="font-semibold text-gray-700">活動日期：</span><span class="text-gray-800">${dateStr}</span></div>
+                        <div><span class="font-semibold text-gray-700">建立者：</span><span class="text-gray-800">${data.creatorName || 'N/A'}</span></div>
+                        <div class="text-xs text-gray-500 mt-2">歸檔者：${data.archivedByName || 'N/A'}，時間：${data.archivedAt ? '' : 'N/A'}</div>
+                    </div>
+                `;
+                modalButtons.innerHTML = `<button id="modal-ok-btn" class="px-4 py-2 bg-red-600 text-white text-base font-medium rounded-md w-1/2 shadow-sm hover:bg-red-700">關閉</button>`;
+                customModal.classList.remove('hidden');
+                document.getElementById('modal-ok-btn').onclick = () => { customModal.classList.add('hidden'); };
+            }
+
+            // 事件委派：處理活動資料庫的查看與恢復
+            eventsArchiveList.addEventListener('click', async (e) => {
+                const restoreBtn = e.target.closest('.restore-archived-event-btn');
+                if (restoreBtn) {
+                    const eventId = restoreBtn.dataset.id;
+                    if (await showCustomConfirm('恢復此活動到會議活動列表？')) {
+                        showLoader();
+                        try {
+                            await restoreEventFromArchive(eventId);
+                            showCustomAlert('活動已恢復到列表。');
+                        } catch (err) {
+                            console.error('Error restoring archived event:', err);
+                            showCustomAlert('恢復失敗，請稍後再試。');
+                        } finally {
+                            hideLoader();
+                        }
+                    }
+                    return;
+                }
+                const viewBtn = e.target.closest('.view-archived-event-btn');
+                if (viewBtn) {
+                    const eventId = viewBtn.dataset.id;
+                    try {
+                        await openArchivedEventDetails(eventId);
+                    } catch (err) {
+                        console.error('Open archived event details error:', err);
+                        showCustomAlert('開啟活動詳情失敗');
+                    }
+                    return;
+                }
+                const card = e.target.closest('.archived-event-card');
+                if (card) {
+                    const eventId = card.getAttribute('data-id');
+                    try { await openArchivedEventDetails(eventId); } catch (_) {}
+                }
+            });
             function listenToEvents() {
                 const eventsList = document.getElementById('events-list');
                 const q = query(collection(db, ...eventsCollectionPath()));
@@ -3712,6 +3782,46 @@ const topicCells = currentTopics.map((t, tIdx) => {
                     collection(db, ...topicsArchiveCollectionPath(eventId))
                 );
                 await deleteEventAndSubcollection(eventId);
+            }
+
+            async function deleteArchiveSubcollections(eventId) {
+                // Delete archived residents
+                const archivedResidentsColRef = collection(db, ...residentsArchiveCollectionPath(eventId));
+                const residentsSnapshot = await getDocs(archivedResidentsColRef);
+                if (!residentsSnapshot.empty) {
+                    const batch = writeBatch(db);
+                    residentsSnapshot.docs.forEach(doc => batch.delete(doc.ref));
+                    await batch.commit();
+                }
+                // Delete archived topics
+                const archivedTopicsColRef = collection(db, ...topicsArchiveCollectionPath(eventId));
+                const topicsSnapshot = await getDocs(archivedTopicsColRef);
+                if (!topicsSnapshot.empty) {
+                    const batch2 = writeBatch(db);
+                    topicsSnapshot.docs.forEach(doc => batch2.delete(doc.ref));
+                    await batch2.commit();
+                }
+            }
+
+            async function restoreEventFromArchive(eventId) {
+                const srcEventRef = doc(db, ...eventArchiveDocPath(eventId));
+                const srcSnap = await getDoc(srcEventRef);
+                if (!srcSnap.exists()) throw new Error('Archived event not found');
+                const data = srcSnap.data();
+                // 寫回 events 集合（沿用原 eventId）
+                await setDoc(doc(db, ...eventDocPath(eventId)), data);
+                // 複製子集合回 events
+                await copySubcollection(
+                    collection(db, ...residentsArchiveCollectionPath(eventId)),
+                    collection(db, ...residentsCollectionPath(eventId))
+                );
+                await copySubcollection(
+                    collection(db, ...topicsArchiveCollectionPath(eventId)),
+                    collection(db, ...topicsCollectionPath(eventId))
+                );
+                // 清理歸檔子集合並刪除歸檔 doc
+                await deleteArchiveSubcollections(eventId);
+                await deleteDoc(srcEventRef);
             }
             
             document.getElementById('print-roster-sequential-btn').addEventListener('click', () => {
