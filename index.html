@@ -203,6 +203,7 @@
             <header class="flex flex-wrap justify-between items-center mb-6 pb-4 border-b">
                 <h1 class="text-3xl font-bold text-gray-800">會議活動列表</h1>
                 <div class="flex items-center space-x-4 mt-4 sm:mt-0">
+                    <button id="events-database-btn" class="bg-blue-500 text-white font-bold py-2 px-4 rounded-md hover:bg-blue-600">活動資料庫</button>
                     <button id="create-event-btn" class="bg-red-600 text-white font-bold py-2 px-4 rounded-md hover:bg-red-700">新增會議活動</button>
                     <button id="user-management-btn" class="bg-green-500 text-white font-bold py-2 px-4 rounded-md hover:bg-green-600">帳號管理</button>
                     <div class="text-right">
@@ -780,6 +781,11 @@ const topicsCollectionPath = (eventId) => ["events", eventId, "topics"];
 const topicDocPath = (eventId, topicId) => ["events", eventId, "topics", topicId];
 const usersCollectionPath = () => ["users"];
 const userDocPath = (userId) => ["users", userId];
+        // --- Firestore Archive Paths ---
+        const eventsArchiveCollectionPath = () => ["events_archive"];
+        const eventArchiveDocPath = (eventId) => ["events_archive", eventId];
+        const residentsArchiveCollectionPath = (eventId) => ["events_archive", eventId, "residents"];
+        const topicsArchiveCollectionPath = (eventId) => ["events_archive", eventId, "topics"];
 
         // This listener ensures that the rest of the code runs only after the HTML document is fully loaded.
         window.addEventListener('DOMContentLoaded', () => {
@@ -818,6 +824,7 @@ const userDocPath = (userId) => ["users", userId];
             const shareModal = document.getElementById('share-modal');
             const closeShareModalBtn = document.getElementById('close-share-modal-btn');
             const shareQrCodeContainer = document.getElementById('share-qr-code');
+            const eventsDatabaseBtn = document.getElementById('events-database-btn');
             const shareLink = document.getElementById('share-link');
             const shareUrlDisplay = document.getElementById('share-url-display');
             const addUserForm = document.getElementById('add-user-form');
@@ -1319,6 +1326,29 @@ const userDocPath = (userId) => ["users", userId];
 
             document.getElementById('back-to-events-btn').addEventListener('click', showEventSelectionView);
 
+            // 活動資料庫按鈕：首次點擊可設定 URL，之後直接開啟
+            const EVENTS_DATABASE_URL_KEY = 'eventsDatabaseUrl';
+            function getEventsDatabaseUrl() {
+                try { return localStorage.getItem(EVENTS_DATABASE_URL_KEY) || ''; } catch (_) { return ''; }
+            }
+            function setEventsDatabaseUrl(url) {
+                try { localStorage.setItem(EVENTS_DATABASE_URL_KEY, url); } catch (_) {}
+            }
+            eventsDatabaseBtn.addEventListener('click', () => {
+                const url = getEventsDatabaseUrl();
+                if (!url) {
+                    const input = prompt('請輸入活動資料庫連結 URL：', 'https://');
+                    if (input && /^https?:\/\//.test(input)) {
+                        setEventsDatabaseUrl(input);
+                        window.open(input, '_blank');
+                    } else {
+                        showCustomAlert('未設定有效的活動資料庫連結。');
+                    }
+                } else {
+                    window.open(url, '_blank');
+                }
+            });
+
 
             // --- Event Management ---
             function listenToEvents() {
@@ -1371,6 +1401,13 @@ const userDocPath = (userId) => ["users", userId];
                                 </svg>
                             </button>
                         ` : '';
+                        const actionsHTML = showDeleteButton ? `
+                            <div class="flex items-center space-x-2">
+                                <button data-id="${event.id}" class="duplicate-event-card-btn text-xs font-semibold px-2 py-1 rounded-md border ${isOwner ? 'border-red-300 text-red-100 hover:bg-red-700 hover:text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}">複製活動</button>
+                                <button data-id="${event.id}" class="archive-event-card-btn text-xs font-semibold px-2 py-1 rounded-md border ${isOwner ? 'border-red-300 text-red-100 hover:bg-red-700 hover:text-white' : 'border-gray-300 text-gray-600 hover:bg-gray-100'}">移至活動資料庫</button>
+                                ${deleteButtonHTML}
+                            </div>
+                        ` : '';
 
                         const formattedDateTime = event.eventDate ? event.eventDate.replace('T', ' ') : '無日期';
 
@@ -1378,7 +1415,7 @@ const userDocPath = (userId) => ["users", userId];
                             <div>
                                 <div class="flex justify-between items-start">
                                     <h3 class="text-lg font-bold ${isOwner ? 'text-white' : 'text-red-700'}">${event.communityName}</h3>
-                                    ${deleteButtonHTML}
+                                    ${actionsHTML}
                                 </div>
                                 <p class="text-md ${isOwner ? 'text-gray-200' : 'text-gray-800'}">${event.eventName}</p>
                             </div>
@@ -1414,6 +1451,40 @@ const userDocPath = (userId) => ["users", userId];
                         } catch (error) {
                             console.error("Error deleting event from card:", error);
                             showCustomAlert('刪除活動失敗。');
+                        } finally {
+                            hideLoader();
+                        }
+                    }
+                }
+                const duplicateButton = e.target.closest('.duplicate-event-card-btn');
+                if (duplicateButton) {
+                    e.stopPropagation();
+                    const eventId = duplicateButton.dataset.id;
+                    if (await showCustomConfirm('複製此活動與其住戶、主題資料？建立一個新的活動。')) {
+                        showLoader();
+                        try {
+                            await duplicateEventWithSubcollections(eventId);
+                            showCustomAlert('活動已成功複製。');
+                        } catch (error) {
+                            console.error('Error duplicating event:', error);
+                            showCustomAlert('複製活動失敗。');
+                        } finally {
+                            hideLoader();
+                        }
+                    }
+                }
+                const archiveButton = e.target.closest('.archive-event-card-btn');
+                if (archiveButton) {
+                    e.stopPropagation();
+                    const eventId = archiveButton.dataset.id;
+                    if (await showCustomConfirm('移動此活動至活動資料庫並從列表移除？')) {
+                        showLoader();
+                        try {
+                            await archiveEventWithSubcollections(eventId);
+                            showCustomAlert('活動已移至活動資料庫。');
+                        } catch (error) {
+                            console.error('Error archiving event:', error);
+                            showCustomAlert('移至活動資料庫失敗。');
                         } finally {
                             hideLoader();
                         }
@@ -3494,6 +3565,64 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 }
                 // Finally delete the event doc
                 await deleteDoc(doc(db, ...eventDocPath(eventId)));
+            }
+
+            async function copySubcollection(srcColRef, destColRef) {
+                const snapshot = await getDocs(srcColRef);
+                if (snapshot.empty) return;
+                let batch = writeBatch(db);
+                let count = 0;
+                for (const docSnap of snapshot.docs) {
+                    const destDocRef = doc(destColRef, docSnap.id);
+                    batch.set(destDocRef, docSnap.data());
+                    count++;
+                    if (count >= 400) {
+                        await batch.commit();
+                        batch = writeBatch(db);
+                        count = 0;
+                    }
+                }
+                if (count > 0) {
+                    await batch.commit();
+                }
+            }
+
+            async function duplicateEventWithSubcollections(eventId) {
+                const srcEventRef = doc(db, ...eventDocPath(eventId));
+                const srcSnap = await getDoc(srcEventRef);
+                if (!srcSnap.exists()) throw new Error('Source event not found');
+                const data = srcSnap.data();
+                const newEventRef = await addDoc(collection(db, ...eventsCollectionPath()), {
+                    ...data,
+                    createdAt: serverTimestamp(),
+                    creatorId: currentUser.uid,
+                    creatorName: currentUser.name
+                });
+                await copySubcollection(
+                    collection(db, ...residentsCollectionPath(eventId)),
+                    collection(db, ...residentsCollectionPath(newEventRef.id))
+                );
+                await copySubcollection(
+                    collection(db, ...topicsCollectionPath(eventId)),
+                    collection(db, ...topicsCollectionPath(newEventRef.id))
+                );
+            }
+
+            async function archiveEventWithSubcollections(eventId) {
+                const srcEventRef = doc(db, ...eventDocPath(eventId));
+                const srcSnap = await getDoc(srcEventRef);
+                if (!srcSnap.exists()) throw new Error('Source event not found');
+                const data = srcSnap.data();
+                await setDoc(doc(db, ...eventArchiveDocPath(eventId)), data);
+                await copySubcollection(
+                    collection(db, ...residentsCollectionPath(eventId)),
+                    collection(db, ...residentsArchiveCollectionPath(eventId))
+                );
+                await copySubcollection(
+                    collection(db, ...topicsCollectionPath(eventId)),
+                    collection(db, ...topicsArchiveCollectionPath(eventId))
+                );
+                await deleteEventAndSubcollection(eventId);
             }
             
             document.getElementById('print-roster-sequential-btn').addEventListener('click', () => {
