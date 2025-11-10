@@ -364,6 +364,14 @@
                                  <button id="start-scan-btn" class="w-full bg-green-500 text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 disabled:bg-gray-400">開始掃碼</button>
                                  <button id="stop-scan-btn" class="w-full bg-red-500 text-white font-bold py-2 px-4 rounded-md hover:bg-red-600 disabled:bg-gray-400" disabled>停止掃碼</button>
                              </div>
+                             <div class="flex items-center gap-3 mb-4">
+                                 <label for="camera-select-scanner" class="text-sm text-gray-700">相機</label>
+                                 <select id="camera-select-scanner" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                     <option value="">自動選擇相機</option>
+                                 </select>
+                                 <input type="file" id="scan-file-input" accept="image/*" capture="environment" class="hidden">
+                                 <button id="scan-file-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">上傳圖片掃碼</button>
+                             </div>
                              <div id="reader" class="w-full aspect-square bg-gray-100 flex items-center justify-center">
                                  <p id="reader-placeholder" class="text-gray-500">請點擊 "開始掃碼"</p>
                              </div>
@@ -442,6 +450,14 @@
                                 <div class="flex items-center gap-2">
                                     <button id="start-scanvote-btn" class="flex-1 bg-green-500 text-white font-bold py-2 px-4 rounded-md hover:bg-green-600 disabled:bg-gray-400">開始掃碼</button>
                                     <button id="stop-scanvote-btn" class="flex-1 bg-red-500 text-white font-bold py-2 px-4 rounded-md hover:bg-red-600 disabled:bg-gray-400" disabled>停止掃碼</button>
+                                </div>
+                                <div class="flex items-center gap-3 mt-4">
+                                    <label for="camera-select-vote" class="text-sm text-gray-700">相機</label>
+                                    <select id="camera-select-vote" class="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-red-500 focus:border-red-500">
+                                        <option value="">自動選擇相機</option>
+                                    </select>
+                                    <input type="file" id="scanvote-file-input" accept="image/*" capture="environment" class="hidden">
+                                    <button id="scanvote-file-btn" class="bg-blue-500 text-white px-3 py-2 rounded-md hover:bg-blue-600 text-sm font-semibold">上傳圖片掃碼</button>
                                 </div>
                                 <div id="vote-reader" class="mt-4 aspect-video bg-gray-100 rounded-md flex items-center justify-center">
                                     <p id="vote-reader-placeholder" class="text-gray-500">請點擊 "開始掃碼"</p>
@@ -2698,6 +2714,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
             const startScanBtn = document.getElementById('start-scan-btn');
             const stopScanBtn = document.getElementById('stop-scan-btn');
             const readerPlaceholder = document.getElementById('reader-placeholder');
+            const cameraSelectScanner = document.getElementById('camera-select-scanner');
+            const scanFileBtn = document.getElementById('scan-file-btn');
+            const scanFileInput = document.getElementById('scan-file-input');
+            let scannerCamerasLoaded = false;
+            let selectedCameraIdScanner = '';
 
             scanGunForm.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -2714,21 +2735,68 @@ const topicCells = currentTopics.map((t, tIdx) => {
             speechSynthesis.speak(utterance);
             }
 
-            startScanBtn.addEventListener('click', () => {
+            async function populateCamerasForScanner() {
+                try {
+                    const devices = await Html5Qrcode.getCameras();
+                    if (!cameraSelectScanner) return;
+                    cameraSelectScanner.innerHTML = '<option value="">自動選擇相機</option>';
+                    (devices || []).forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        opt.textContent = d.label || `相機 ${d.id}`;
+                        cameraSelectScanner.appendChild(opt);
+                    });
+                    scannerCamerasLoaded = true;
+                } catch (_) {
+                    // 保持自動選擇
+                }
+            }
+
+            cameraSelectScanner?.addEventListener('change', (e) => {
+                selectedCameraIdScanner = e.target.value || '';
+            });
+
+            startScanBtn.addEventListener('click', async () => {
                 if (!html5QrCode) html5QrCode = new Html5Qrcode("reader");
-                const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1 };
-                
+                const config = { fps: 10, qrbox: { width: 250, height: 250 }, aspectRatio: 1, rememberLastUsedCamera: true };
+                if (!scannerCamerasLoaded) await populateCamerasForScanner();
+                const cameraParam = selectedCameraIdScanner ? { deviceId: { exact: selectedCameraIdScanner } } : { facingMode: "environment" };
                 readerPlaceholder.classList.add('hidden');
-                html5QrCode.start({ facingMode: "environment" }, config, (decodedText) => handleCheckIn(decodedText, '攝影機'))
+                html5QrCode.start(cameraParam, config, (decodedText) => handleCheckIn(decodedText, '攝影機'))
                     .then(() => {
                         startScanBtn.disabled = true;
                         stopScanBtn.disabled = false;
                     })
                     .catch(err => {
-                        document.getElementById('scanner-status').textContent = '無法啟動攝影機。請確認權限。';
-                        document.getElementById('scanner-status').className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                        const s = document.getElementById('scanner-status');
+                        s.textContent = '無法啟動攝影機。請確認權限。';
+                        s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
                         readerPlaceholder.classList.remove('hidden');
+                        const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+                        if (isiOS && !window.isSecureContext) {
+                            s.textContent = 'iOS 可能因非安全來源而封鎖相機，請改用「上傳圖片掃碼」或以 HTTPS 存取。';
+                        }
                     });
+            });
+
+            scanFileBtn?.addEventListener('click', () => scanFileInput?.click());
+            scanFileInput?.addEventListener('change', async (e) => {
+                try {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!html5QrCode) html5QrCode = new Html5Qrcode('reader');
+                    const decodedText = await html5QrCode.scanFile(file, true);
+                    handleCheckIn(decodedText, '圖片');
+                    const s = document.getElementById('scanner-status');
+                    s.textContent = '圖片掃碼成功';
+                    s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-green-100 text-green-800';
+                } catch (_) {
+                    const s = document.getElementById('scanner-status');
+                    s.textContent = '圖片掃碼失敗：無法辨識此影像';
+                    s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                } finally {
+                    try { e.target.value = ''; } catch (_) {}
+                }
             });
 
             // 顯示單一議題的投票明細對話框（住戶整合視圖 + 原始逐票視圖）
@@ -2911,6 +2979,11 @@ const topicCells = currentTopics.map((t, tIdx) => {
             const stopScanVoteBtn = document.getElementById('stop-scanvote-btn');
             const scanVoteGunForm = document.getElementById('scanvote-gun-form');
             const scanVoteGunInput = document.getElementById('scanvote-gun-input');
+            const cameraSelectVote = document.getElementById('camera-select-vote');
+            const scanVoteFileBtn = document.getElementById('scanvote-file-btn');
+            const scanVoteFileInput = document.getElementById('scanvote-file-input');
+            let voteCamerasLoaded = false;
+            let selectedCameraIdVote = '';
 
             scanVoteGunForm.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -2934,11 +3007,32 @@ const topicCells = currentTopics.map((t, tIdx) => {
                 }
             }
 
-            startScanVoteBtn.addEventListener('click', () => {
-                const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+            async function populateCamerasForVote() {
+                try {
+                    const devices = await Html5Qrcode.getCameras();
+                    if (!cameraSelectVote) return;
+                    cameraSelectVote.innerHTML = '<option value="">自動選擇相機</option>';
+                    (devices || []).forEach(d => {
+                        const opt = document.createElement('option');
+                        opt.value = d.id;
+                        opt.textContent = d.label || `相機 ${d.id}`;
+                        cameraSelectVote.appendChild(opt);
+                    });
+                    voteCamerasLoaded = true;
+                } catch (_) {}
+            }
+
+            cameraSelectVote?.addEventListener('change', (e) => {
+                selectedCameraIdVote = e.target.value || '';
+            });
+
+            startScanVoteBtn.addEventListener('click', async () => {
+                const config = { fps: 10, qrbox: { width: 250, height: 250 }, rememberLastUsedCamera: true };
                 try {
                     if (!html5QrCodeVote) html5QrCodeVote = new Html5Qrcode('vote-reader');
-                    html5QrCodeVote.start({ facingMode: 'environment' }, config, (decodedText) => handleVoteScan(decodedText, '攝影機'))
+                    if (!voteCamerasLoaded) await populateCamerasForVote();
+                    const cameraParam = selectedCameraIdVote ? { deviceId: { exact: selectedCameraIdVote } } : { facingMode: 'environment' };
+                    html5QrCodeVote.start(cameraParam, config, (decodedText) => handleVoteScan(decodedText, '攝影機'))
                         .then(() => {
                             // 啟動掃描時重置重複碼記錄，避免跨次掃描受到前次影響
                             lastVotedCode = null;
@@ -2951,11 +3045,35 @@ const topicCells = currentTopics.map((t, tIdx) => {
                             const s = document.getElementById('scanvote-status');
                             s.textContent = '無法啟動攝影機。請確認權限。';
                             s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                            const isiOS = /iPhone|iPad|iPod/i.test(navigator.userAgent);
+                            if (isiOS && !window.isSecureContext) {
+                                s.textContent = 'iOS 可能因非安全來源而封鎖相機，請改用「上傳圖片掃碼」或以 HTTPS 存取。';
+                            }
                         });
                 } catch (e) {
                     const s = document.getElementById('scanvote-status');
                     s.textContent = '無法啟動攝影機。請確認權限。';
                     s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                }
+            });
+
+            scanVoteFileBtn?.addEventListener('click', () => scanVoteFileInput?.click());
+            scanVoteFileInput?.addEventListener('change', async (e) => {
+                try {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (!html5QrCodeVote) html5QrCodeVote = new Html5Qrcode('vote-reader');
+                    const decodedText = await html5QrCodeVote.scanFile(file, true);
+                    await handleVoteScan(decodedText, '圖片');
+                    const s = document.getElementById('scanvote-status');
+                    s.textContent = '圖片掃碼成功';
+                    s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-green-100 text-green-800';
+                } catch (_) {
+                    const s = document.getElementById('scanvote-status');
+                    s.textContent = '圖片掃碼失敗：無法辨識此影像';
+                    s.className = 'mt-4 text-center font-semibold p-3 rounded-md bg-red-100 text-red-700';
+                } finally {
+                    try { e.target.value = ''; } catch (_) {}
                 }
             });
 
